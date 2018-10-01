@@ -9,7 +9,7 @@
 using namespace std;
 using namespace LOFAR;
 
-void checkAxes(H5Parm::SolTab& soltab) {
+void checkAxes(H5Parm::SolTab& soltab, size_t ntimes) {
   ASSERT(soltab.nAxes()==3);
   ASSERT(soltab.hasAxis("ant"));
   ASSERT(soltab.hasAxis("time"));
@@ -18,12 +18,13 @@ void checkAxes(H5Parm::SolTab& soltab) {
   ASSERT(soltab.getAxis(1).name=="time");
   ASSERT(soltab.getAxis(2).name=="bla");
   ASSERT(soltab.getAxis(0).size==3);
-  ASSERT(soltab.getAxis(1).size==4);
+  ASSERT(soltab.getAxis(1).size==ntimes);
   ASSERT(soltab.getAxis(2).size==1);
 }
 
 int main(int, char**) {
   {
+    size_t ntimes=7;
     {
       // Create a new H5Parm
       cout<<"Create tH5Parm_tmp.h5"<<endl;
@@ -49,7 +50,7 @@ int main(int, char**) {
 
       vector<H5Parm::AxisInfo> axes;
       axes.push_back(H5Parm::AxisInfo("ant",3));
-      axes.push_back(H5Parm::AxisInfo("time",4));
+      axes.push_back(H5Parm::AxisInfo("time",ntimes));
       axes.push_back(H5Parm::AxisInfo("bla",1));
 
       cout<<"Create new SolTab"<<endl;
@@ -62,14 +63,19 @@ int main(int, char**) {
       // Check the axes
       H5Parm::SolTab soltab = h5parm.getSolTab("mysol");
       ASSERT(soltab.getType()=="mytype");
-      checkAxes(soltab);
+      checkAxes(soltab, ntimes);
 
       // Add some data
-      vector<double> vals(3*4);
-      for (size_t ant=0; ant<3; ++ant)
-        for (size_t time=0; time<4; ++time)
-          vals[ant*4+time]=10*ant+time;
-      soltab.setValues(vals, vector<double>(), "CREATE with DPPP");
+      vector<double> vals(3*ntimes);
+      vector<double> weights(3*ntimes);
+      for (size_t ant=0; ant<3; ++ant) {
+        for (size_t time=0; time<ntimes; ++time) {
+          vals[ant*ntimes+time]=10*ant+time;
+          weights[ant*ntimes+time]=0.4;
+        }
+      }
+
+      soltab.setValues(vals, weights, "CREATE with DPPP");
 
       // Add metadata for stations
       vector<string> someAntNames;
@@ -80,9 +86,9 @@ int main(int, char**) {
 
       // Add metadata for times
       vector<double> times;
-      times.push_back(57878.5);
-      times.push_back(57880.5);
-      times.push_back(57882.5);
+      for (size_t time=0; time<ntimes; ++time) {
+        times.push_back(57878.5+2.0*time);
+      }
       soltab.setTimes(times);
 
       // Add metadata for freqs;
@@ -117,13 +123,13 @@ int main(int, char**) {
       // Check the axes
       H5Parm::SolTab soltab = h5parm.getSolTab("mysol");
       ASSERT(soltab.getType()=="mytype");
-      checkAxes(soltab);
+      checkAxes(soltab, ntimes);
 
       cout<<"read some data"<<endl;
       double starttime = 57878.49999;
       hsize_t starttimeindex = soltab.getTimeIndex(starttime);
       cout<<"starttimeindex="<<starttimeindex<<endl;
-      vector<double> val = soltab.getValues("Antenna2", starttimeindex, 4);
+      vector<double> val = soltab.getValues("Antenna2", starttimeindex, ntimes);
       ASSERT(casa::near(val[0],10.));
       ASSERT(casa::near(val[1],11.));
       ASSERT(casa::near(val[2],12.));
@@ -147,8 +153,43 @@ int main(int, char**) {
       ASSERT(casa::near(soltab.getFreqInterval(0),1e6));
       ASSERT(casa::near(soltab.getFreqInterval(1),4e6));
       ASSERT(casa::near(soltab.getFreqInterval(2),2e6));
-    }
 
+      cout<<"Checking interpolation (on input time axis)"<<endl;
+      vector<double> freqs;
+      freqs.push_back(130e6);
+      freqs.push_back(131e6);
+
+      vector<double> times;
+      for (size_t time=0; time<ntimes; ++time) {
+        times.push_back(57878.5+2.0*time);
+      }
+
+      vector<double> newgridvals = soltab.getValuesOrWeights("val", "Antenna1",
+                                                         times, freqs, 0, 0);
+      ASSERT(newgridvals.size() == times.size() * freqs.size());
+      size_t idx=0;
+      for (size_t time=0; time<times.size(); ++time) {
+        for (size_t freq=0; freq<freqs.size(); ++freq) {
+          ASSERT(casa::near(newgridvals[idx++], double(time)));
+        }
+      }
+
+      times.clear();
+      cout<<"Checking interpolation, upsampled 3 times, add 2 time slots at end"<<endl;
+      for (size_t time=0; time<3*ntimes+2; ++time) {
+        times.push_back(57878.5+2.0*time/3.);
+      }
+      newgridvals = soltab.getValuesOrWeights("val", "Antenna1",
+                                              times, freqs, 0, 0);
+      ASSERT(newgridvals.size() == times.size() * freqs.size());
+      idx=0;
+      for (int time=0; time<int(times.size()); ++time) {
+        for (size_t freq=0; freq<freqs.size(); ++freq) {
+          ASSERT(casa::near(newgridvals[idx++], min(double((time+1)/3),double(ntimes-1))));
+        }
+      }
+      
+    }
     // Remove the file
 //    remove("tH5Parm_tmp.h5");
   }

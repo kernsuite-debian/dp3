@@ -1,12 +1,17 @@
-# $Id: CMakeLists.txt 27640 2013-12-04 08:02:49Z diepen $
+# Required for the ObjectFactory
+include_directories(../Common)
 
-lofar_package(DPPP_DDECal 1.0 DEPENDS DPPP)
+include_directories(${ARMADILLO_INCLUDE_DIRS})
 
-include(LofarFindPackage)
-lofar_find_package(Casacore COMPONENTS casa ms tables REQUIRED)
-lofar_find_package(Armadillo REQUIRED)
-lofar_find_package(Boost REQUIRED COMPONENTS date_time)
+add_library(dppp_ddecal SHARED
+  DDECal.cc Register.cc Stopwatch.cc
+  KLFitter.cc DDECal.cc MultiDirSolver.cc Constraint.cc PiercePoint.cc
+  ScreenConstraint.cc SmoothnessConstraint.cc
+  TECConstraint.cc RotationConstraint.cc
+  RotationAndDiagonalConstraint.cc
+)
+target_link_libraries(dppp_ddecal ${ARMADILLO_LIBRARIES})
 
-add_subdirectory(include/DPPP_DDECal)
-add_subdirectory(src)
-add_subdirectory(test)
+install (TARGETS dppp_ddecal DESTINATION lib) 
+
+#add_subdirectory(test)
