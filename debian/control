@@ -2,7 +2,24 @@ Source: dp3
 Section: science
 Priority: extra
 Maintainer: KERN packaging <packaging@kernsuite.info>
-Build-Depends: cmake, debhelper (>=9), libhdf5-dev
+Build-Depends:
+ cmake,
+ debhelper (>=9),
+ libhdf5-dev,
+ casacore-dev,
+ libblas-dev,
+ liblapack-dev,
+ libboost-dev,
+ libboost-filesystem-dev,
+ libboost-system-dev,
+ python-dev,
+ libboost-date-time-dev,
+ libboost-python-dev,
+ libxml2-dev,
+ libpng-dev,
+ libcfitsio-dev,
+ libarmadillo-dev,
+ aoflagger-dev
 Standards-Version: 3.9.8
 Homepage: https://github.com/lofar-astron/DP3
 
