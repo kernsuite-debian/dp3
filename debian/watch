@@ -1,4 +1,4 @@
 version=4
-opts="mode=git, pgpmode=none" \
+opts="mode=git, pgpmode=none", pretty=3.1.7+git%cd.%h \
 https://github.com/lofar-astron/DP3 \
 HEAD debian uupdate
