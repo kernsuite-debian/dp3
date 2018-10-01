@@ -1,3 +1,10 @@
+dp3 (3.1.7+git20181001.daa59fd-1kern1) bionic; urgency=medium
+
+  [ Gijs Molenaar ]
+  * add lofar beammodel
+
+ -- KERN packaging <packaging@kernsuite.info>  Mon, 01 Oct 2018 11:45:18 +0200
+
 dp3 (3.1.7+git20181001.daa59fd-1) bionic; urgency=medium
 
   [ Gijs Molenaar ]
