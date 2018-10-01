@@ -1,3 +1,11 @@
+dp3 (3.1.7+git20181001.daa59fd-1) bionic; urgency=medium
+
+  [ Gijs Molenaar ]
+  * New upstream version 3.1.7+git20181001.daa59fd
+  * remove patch
+
+ -- KERN packaging <packaging@kernsuite.info>  Mon, 01 Oct 2018 11:41:05 +0200
+
 dp3 (3.1.7+git20181001.ca815aa-1) bionic; urgency=medium
 
   [ Gijs Molenaar ]
