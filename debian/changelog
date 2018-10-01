@@ -1,3 +1,12 @@
+dp3 (3.1.7+git20181001.ca815aa-1) bionic; urgency=medium
+
+  [ Gijs Molenaar ]
+  * add verison
+  * typo
+  * New upstream version 3.1.7+git20181001.ca815aa
+
+ -- KERN packaging <packaging@kernsuite.info>  Mon, 01 Oct 2018 10:49:11 +0200
+
 dp3 (3.1.7-1kern1) bionic; urgency=low
 
   * Initial release.
