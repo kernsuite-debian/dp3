@@ -1,13 +1,20 @@
-# $Id$
+include(PythonInstall)
 
-lofar_package(DPPP 1.0 DEPENDS LofarStMan Common MS ParmDB StationResponse)
+add_executable(DPPP DPPP.cc ${DPPP_OBJECT} ${PARMDB_OBJECT} ${BLOB_OBJECT} ${COMMON_OBJECT})
+target_link_libraries(DPPP ${HDF5_LIBRARIES} ${HDF5_CXX_LIBRARIES} ${CASACORE_LIBRARIES} ${LOFAR_STATION_RESPONSE_LIB} ${Boost_FILESYSTEM_LIBRARY} ${Boost_SYSTEM_LIBRARY})
 
-include(LofarFindPackage)
-lofar_find_package(Casacore COMPONENTS casa ms tables REQUIRED)
-lofar_find_package(HDF5 COMPONENTS CXX REQUIRED)
+install(TARGETS DPPP DESTINATION bin)
 
-add_subdirectory(include/DPPP)
-add_subdirectory(src)
-add_subdirectory(share)
-add_subdirectory(etc)
-add_subdirectory(test)
+# Data files
+install(
+  FILES share/LOFAR-LBA-default.rfis share/LOFAR-HBA-default.rfis
+  DESTINATION share/rfistrategies)
+
+# lofar_add_bin_scripts(taqlflagger)
+
+# Python modules.
+python_install(
+  __init__.py
+  DESTINATION lofar/dppp)
+
+#add_subdirectory(test)
