@@ -1,0 +1,13 @@
+Source: dp3
+Section: science
+Priority: extra
+Maintainer: KERN packaging <packaging@kernsuite.info>
+Build-Depends: cmake, debhelper (>=9)
+Standards-Version: 3.9.8
+Homepage: https://github.com/lofar-astron/DP3
+
+Package: dp3
+Architecture: any
+Multi-Arch: foreign
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Description: streaming processing pipeline for radio interferometric data
