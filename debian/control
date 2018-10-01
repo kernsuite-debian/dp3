@@ -19,7 +19,8 @@ Build-Depends:
  libpng-dev,
  libcfitsio-dev,
  libarmadillo-dev,
- aoflagger-dev
+ aoflagger-dev,
+ lofar-dev
 Standards-Version: 3.9.8
 Homepage: https://github.com/lofar-astron/DP3
 
