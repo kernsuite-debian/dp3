@@ -29,6 +29,7 @@ X-Python-Version: >= 2.6
 
 Package: python-dp3
 Architecture: any
+Conflicts: python-lofar
 Depends: ${misc:Depends}, ${shlibs:Depends}, ${python:Depends}
 Description: streaming processing pipeline for radio data (python 2)
 
