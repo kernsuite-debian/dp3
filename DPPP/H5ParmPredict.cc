@@ -25,7 +25,6 @@
 
 #include "Exceptions.h"
 
-#include "../Common/OpenMP.h"
 #include "../Common/ParameterSet.h"
 #include "../Common/StreamUtil.h"
 #include "../Common/StringUtil.h"
@@ -49,8 +48,7 @@ namespace DP3 {
                       const string& prefix) :
       itsInput(input),
       itsH5ParmName(parset.getString(prefix+"applycal.parmdb")),
-      itsDirections(parset.getStringVector(prefix+"directions", vector<string> ())),
-      itsThreadPool(OpenMP::maxThreads())
+      itsDirections(parset.getStringVector(prefix+"directions", vector<string> ()))
     {
       H5Parm h5parm = H5Parm(itsH5ParmName, false);
       std::string soltabName = parset.getString(prefix+"applycal.correction"); 
@@ -95,7 +93,7 @@ namespace DP3 {
         if (i>0) {
           itsPredictSteps[i-1]->setNextStep(itsPredictSteps[i]);
         }
-        itsPredictSteps[i]->setThreadPool(itsThreadPool);
+        itsPredictSteps[i]->setThreadData(itsThreadPool, itsMeasuresMutex);
       }
 
       itsResultStep=new ResultStep();
@@ -111,19 +109,18 @@ namespace DP3 {
       info().setNeedVisData();
       info().setWriteData();
 
-      vector<Predict::ShPtr>::iterator predictstep;
-      for (predictstep=itsPredictSteps.begin();
-           predictstep!=itsPredictSteps.end();
-           predictstep++) {
-        (*predictstep)->updateInfo(infoIn);
+      for(Predict::ShPtr& predictstep : itsPredictSteps)
+      {
+        predictstep->setNThreads(NThreads());
+        predictstep->updateInfo(infoIn);
       }
     }
 
     void H5ParmPredict::show (std::ostream& os) const
     {
-      os << "H5ParmPredict " << itsName << endl;
-      os << "  H5Parm:     " << itsH5ParmName << endl;
-      os << "  directions: " << itsDirections << endl;
+      os << "H5ParmPredict " << itsName << '\n';
+      os << "  H5Parm:     " << itsH5ParmName << '\n';
+      os << "  directions: " << itsDirections << '\n';
       for (uint dir=0; dir<itsPredictSteps.size(); ++dir) {
         itsPredictSteps[dir]->show(os);
       }
@@ -133,11 +130,13 @@ namespace DP3 {
     {
       os << "  ";
       FlagCounter::showPerc1 (os, itsTimer.getElapsed(), duration);
-      os << " H5ParmPredict " << itsName << endl;
+      os << " H5ParmPredict " << itsName << '\n';
     }
 
     bool H5ParmPredict::process (const DPBuffer& bufin)
     {
+      itsThreadPool.SetNThreads(NThreads());
+      
       itsTimer.start();
       itsBuffer.copy (bufin);
       itsInput->fetchUVW(bufin, itsBuffer, itsTimer);

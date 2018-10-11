@@ -38,9 +38,9 @@
 #include "../ParmDB/ParmValue.h"
 #include "../ParmDB/SourceDB.h"
 
+#include "../Common/ParallelFor.h"
 #include "../Common/ParameterSet.h"
 #include "../Common/StringUtil.h"
-#include "../Common/OpenMP.h"
 
 #include <fstream>
 #include <ctime>
@@ -263,7 +263,7 @@ namespace DP3 {
 
         uint nSt=info().antennaUsed().size();
         for (uint st=0; st<nSt; ++st) {
-          itsPhaseFitters.push_back(CountedPtr<PhaseFitter>(new PhaseFitter(itsNFreqCells)));
+          itsPhaseFitters.push_back(std::unique_ptr<PhaseFitter>(new PhaseFitter(itsNFreqCells)));
           double* nu = itsPhaseFitters[st]->FrequencyData();
           for (uint freqCell=0; freqCell<itsNFreqCells; ++freqCell) {
             nu[freqCell] = itsFreqData[freqCell];
@@ -302,7 +302,7 @@ namespace DP3 {
       itsChunkStartTime = info().startTime();
 
       if (itsDebugLevel>0) {
-        assert(OpenMP::maxThreads()==1);
+        assert(NThreads()==1);
         assert(itsTimeSlotsPerParmUpdate >= info().ntime());
         itsAllSolutions.resize(IPosition(6,
                                iS[0].numCorrelations(),
@@ -636,19 +636,19 @@ namespace DP3 {
       vector<StefCal::Status> converged(itsNFreqCells,StefCal::NOTCONVERGED);
       for (;iter<itsMaxIter;++iter) {
         bool allConverged=true;
-#pragma omp parallel for
-        for (uint freqCell=0; freqCell<itsNFreqCells; ++freqCell) {
+        ParallelFor<size_t> loop(NThreads());
+        loop.Run(0, itsNFreqCells, [&](size_t freqCell, size_t /*thread*/) {
           // Do another step when stalled and not all converged
-          if (converged[freqCell]==StefCal::CONVERGED) {
-            continue;
+          if (converged[freqCell]!=StefCal::CONVERGED)
+          {
+            converged[freqCell] = iS[freqCell].doStep(iter);
+            // Only continue if there are steps worth continuing
+            // (so not converged, failed or stalled)
+            if (converged[freqCell]==StefCal::NOTCONVERGED) {
+              allConverged = false;
+            }
           }
-          converged[freqCell] = iS[freqCell].doStep(iter);
-          // Only continue if there are steps worth continuing
-          // (so not converged, failed or stalled)
-          if (converged[freqCell]==StefCal::NOTCONVERGED) {
-            allConverged = false;
-          }
-        }
+        });
 
         if (itsDebugLevel>0) {
           for (uint freqCell=0; freqCell<itsNFreqCells; ++freqCell) {
@@ -688,8 +688,8 @@ namespace DP3 {
             }
           }
 
-#pragma omp parallel for
-          for (uint st=0; st<nSt; ++st) {
+          ParallelFor<size_t> loop(NThreads());
+          loop.Run(0, nSt, [&](size_t st, size_t /*thread*/) {
             uint numpoints=0;
             double* phases = itsPhaseFitters[st]->PhaseData();
             double* weights = itsPhaseFitters[st]->WeightData();
@@ -747,7 +747,7 @@ namespace DP3 {
                                                      ))));
               }
             }
-          }
+          });
           itsTimerPhaseFit.stop();
           itsTimerSolve.start();
         }

@@ -23,7 +23,6 @@
 
 #include "DDECal.h"
 
-#include "../DPPP/ApplyCal.h"
 #include "../DPPP/DPBuffer.h"
 #include "../DPPP/DPInfo.h"
 #include "../DPPP/DPLogger.h"
@@ -32,6 +31,7 @@
 #include "../DPPP/SourceDBUtil.h"
 #include "../DPPP/Version.h"
 
+#include "Matrix2x2.h"
 #include "ScreenConstraint.h"
 #include "TECConstraint.h"
 #include "RotationConstraint.h"
@@ -43,7 +43,6 @@
 #include "../ParmDB/SourceDB.h"
 
 #include "../Common/ThreadPool.h"
-#include "../Common/OpenMP.h"
 #include "../Common/ParameterSet.h"
 #include "../Common/StreamUtil.h"
 #include "../Common/StringUtil.h"
@@ -95,10 +94,11 @@ namespace DP3 {
         itsNChan         (parset.getInt (prefix + "nchan", 1)),
         itsUVWFlagStep   (input, parset, prefix),
         itsCoreConstraint(parset.getDouble (prefix + "coreconstraint", 0.0)),
-  itsSmoothnessConstraint(parset.getDouble (prefix + "smoothnessconstraint", 0.0)),
+        itsSmoothnessConstraint(parset.getDouble (prefix + "smoothnessconstraint", 0.0)),
         itsScreenCoreConstraint(parset.getDouble (prefix + "tecscreen.coreconstraint", 0.0)),
         itsFullMatrixMinimalization(false),
         itsApproximateTEC(false),
+        itsSubtract(parset.getBool(prefix + "subtract", false)),
         itsStatFilename(parset.getString(prefix + "statfilename", ""))
     {
       stringstream ss;
@@ -144,17 +144,34 @@ namespace DP3 {
       itsMode = GainCal::stringToCalType(
                    boost::to_lower_copy(parset.getString(prefix + "mode",
                                             "complexgain")));
+      
+      initializeConstraints(parset, prefix);
+      initializePredictSteps(parset, prefix);
+    }
+
+    DDECal::~DDECal()
+    {}
+
+    DPStep::ShPtr DDECal::makeStep (DPInput* input,
+                                    const ParameterSet& parset,
+                                    const std::string& prefix)
+    {
+      return DPStep::ShPtr(new DDECal(input, parset, prefix));
+    }
+    
+    void DDECal::initializeConstraints(const ParameterSet& parset, const string& prefix)
+    {
       if(itsCoreConstraint != 0.0) {
-        itsConstraints.push_back(casacore::CountedPtr<Constraint>(
+        itsConstraints.push_back(std::unique_ptr<Constraint>(
           new CoreConstraint()));
       }
       if(itsSmoothnessConstraint != 0.0) {
-        itsConstraints.push_back(casacore::CountedPtr<Constraint>(
-        new SmoothnessConstraint(itsSmoothnessConstraint))); 
+        itsConstraints.push_back(std::unique_ptr<Constraint>(
+          new SmoothnessConstraint(itsSmoothnessConstraint))); 
       }
       switch(itsMode) {
         case GainCal::COMPLEXGAIN:
-          itsConstraints.push_back(casacore::CountedPtr<Constraint>(
+          itsConstraints.push_back(std::unique_ptr<Constraint>(
                     new DiagonalConstraint(4)));
           itsMultiDirSolver.set_phase_only(false);
           itsFullMatrixMinimalization = true;
@@ -170,28 +187,28 @@ namespace DP3 {
           itsFullMatrixMinimalization = true;
           break;
         case GainCal::PHASEONLY:
-          itsConstraints.push_back(casacore::CountedPtr<Constraint>(
+          itsConstraints.push_back(std::unique_ptr<Constraint>(
                     new PhaseOnlyConstraint()));
-          itsConstraints.push_back(casacore::CountedPtr<Constraint>(
+          itsConstraints.push_back(std::unique_ptr<Constraint>(
                     new DiagonalConstraint(4)));
           itsMultiDirSolver.set_phase_only(true);
           itsFullMatrixMinimalization = true;
           break;
         case GainCal::SCALARPHASE:
-          itsConstraints.push_back(casacore::CountedPtr<Constraint>(
+          itsConstraints.push_back(std::unique_ptr<Constraint>(
                     new PhaseOnlyConstraint()));
           itsMultiDirSolver.set_phase_only(true);
           break;
         case GainCal::AMPLITUDEONLY:
-          itsConstraints.push_back(casacore::CountedPtr<Constraint>(
+          itsConstraints.push_back(std::unique_ptr<Constraint>(
                     new DiagonalConstraint(4)));
-          itsConstraints.push_back(casacore::CountedPtr<Constraint>(
+          itsConstraints.push_back(std::unique_ptr<Constraint>(
                     new AmplitudeOnlyConstraint()));
           itsMultiDirSolver.set_phase_only(false);
           itsFullMatrixMinimalization = true;
           break;
         case GainCal::SCALARAMPLITUDE:
-          itsConstraints.push_back(casacore::CountedPtr<Constraint>(
+          itsConstraints.push_back(std::unique_ptr<Constraint>(
                     new AmplitudeOnlyConstraint()));
           itsMultiDirSolver.set_phase_only(false);
           itsFullMatrixMinimalization = false;
@@ -203,41 +220,41 @@ namespace DP3 {
           {
             int iters = parset.getInt(prefix + "maxapproxiter", itsMultiDirSolver.max_iterations()/2);
             int chunksize = parset.getInt(prefix + "approxchunksize", 0);
-            casacore::CountedPtr<ApproximateTECConstraint> ptr;
+            std::unique_ptr<ApproximateTECConstraint> ptr;
             if(itsMode == GainCal::TEC)
-              ptr = casacore::CountedPtr<ApproximateTECConstraint>(
+              ptr = std::unique_ptr<ApproximateTECConstraint>(
                 new ApproximateTECConstraint(TECConstraint::TECOnlyMode));
             else
-              ptr = casacore::CountedPtr<ApproximateTECConstraint>(
+              ptr = std::unique_ptr<ApproximateTECConstraint>(
                 new ApproximateTECConstraint(TECConstraint::TECAndCommonScalarMode));
             ptr->SetMaxApproximatingIterations(iters);
             ptr->SetFittingChunkSize(chunksize);
-            itsConstraints.push_back(ptr);
+            itsConstraints.push_back(std::move(ptr));
           }
           else {
             if(itsMode == GainCal::TEC)
-              itsConstraints.push_back(casacore::CountedPtr<Constraint>(
+              itsConstraints.push_back(std::unique_ptr<Constraint>(
                 new TECConstraint(TECConstraint::TECOnlyMode)));
               else
-              itsConstraints.push_back(casacore::CountedPtr<Constraint>(
+              itsConstraints.push_back(std::unique_ptr<Constraint>(
                 new TECConstraint(TECConstraint::TECAndCommonScalarMode)));
           }
           itsMultiDirSolver.set_phase_only(true);
           itsFullMatrixMinimalization = false;
           break;
         case GainCal::TECSCREEN:
-          itsConstraints.push_back(casacore::CountedPtr<Constraint>(
+          itsConstraints.push_back(std::unique_ptr<Constraint>(
                     new ScreenConstraint(parset, prefix+"tecscreen.")));
           itsMultiDirSolver.set_phase_only(true);
           itsFullMatrixMinimalization = false;
           break;
         case GainCal::ROTATIONANDDIAGONAL:
-          itsConstraints.push_back(casacore::CountedPtr<Constraint>(
+          itsConstraints.push_back(std::unique_ptr<Constraint>(
               new RotationAndDiagonalConstraint()));
           itsFullMatrixMinimalization = true;
           break;
         case GainCal::ROTATION:
-          itsConstraints.push_back(casacore::CountedPtr<Constraint>(
+          itsConstraints.push_back(std::unique_ptr<Constraint>(
               new RotationConstraint()));
           itsFullMatrixMinimalization = true;
           break;
@@ -245,55 +262,57 @@ namespace DP3 {
           throw std::runtime_error("Unexpected mode: " + 
                           GainCal::calTypeToString(itsMode));
       }
-
+    }
+    
+    void DDECal::initializePredictSteps(const ParameterSet& parset, const string& prefix)
+    {
       const size_t nDir = itsDirections.size();
       if (itsUseModelColumn) {
         assert(nDir == 1);
       } else {
         itsPredictSteps.resize(nDir);
         for (size_t dir=0; dir<nDir; ++dir) {
-          itsPredictSteps[dir]=Predict(input, parset, prefix, itsDirections[dir]);
+          itsPredictSteps[dir] = Predict(itsInput, parset, prefix, itsDirections[dir]);
+          itsPredictSteps[dir].setNThreads(NThreads());
         }
       }
-    }
-
-    DDECal::~DDECal()
-    {}
-
-    DPStep::ShPtr DDECal::makeStep (DPInput* input,
-                                    const ParameterSet& parset,
-                                    const std::string& prefix)
-    {
-      return DPStep::ShPtr(new DDECal(input, parset, prefix));
     }
 
     void DDECal::updateInfo (const DPInfo& infoIn)
     {
       info() = infoIn;
       info().setNeedVisData();
+      if(itsSubtract)
+        info().setWriteData();
 
       const size_t nDir = itsDirections.size();
 
+      itsUVWFlagStep.setNThreads(NThreads());
       itsUVWFlagStep.updateInfo(infoIn);
       for (size_t dir=0; dir<itsPredictSteps.size(); ++dir) {
+        itsPredictSteps[dir].setNThreads(NThreads());
         itsPredictSteps[dir].updateInfo(infoIn);
       }
+      itsMultiDirSolver.set_nthreads(NThreads());
 
       if (itsSolInt==0) {
         itsSolInt=info().ntime();
       }
 
       itsDataPtrs.resize(itsSolInt);
+			itsWeightPtrs.resize(itsSolInt);
       itsModelDataPtrs.resize(itsSolInt);
       for (uint t=0; t<itsSolInt; ++t) {
         itsModelDataPtrs[t].resize(nDir);
       }
-      for  (uint i=0;i<itsConstraints.size();i++) {
-        itsMultiDirSolver.add_constraint(itsConstraints[i].get());
+      for (std::unique_ptr<Constraint>& constraint : itsConstraints) {
+        constraint->SetNThreads(NThreads());
+        itsMultiDirSolver.add_constraint(constraint.get());
       }
 
-
       itsBufs.resize(itsSolInt);
+      itsOriginalFlags.resize(itsSolInt);
+      itsOriginalWeights.resize(itsSolInt);
 
       itsDataResultStep = ResultStep::ShPtr(new ResultStep());
       itsUVWFlagStep.setNextStep(itsDataResultStep);
@@ -437,11 +456,11 @@ namespace DP3 {
         {
           tecConstraint->initialize(&itsChanBlockFreqs[0]);
         }
-  SmoothnessConstraint* sConstraint = dynamic_cast<SmoothnessConstraint*>(itsConstraints[i].get());
-  if(sConstraint != nullptr)
-  {
-    sConstraint->Initialize(&itsChanBlockFreqs[0]);
-  }
+        SmoothnessConstraint* sConstraint = dynamic_cast<SmoothnessConstraint*>(itsConstraints[i].get());
+        if(sConstraint != nullptr)
+        {
+          sConstraint->Initialize(&itsChanBlockFreqs[0]);
+        }
       }
 
       uint nSt = info().antennaNames().size();
@@ -456,7 +475,7 @@ namespace DP3 {
     void DDECal::show (std::ostream& os) const
     {
       os
-  << "DDECal " << itsName << '\n'
+        << "DDECal " << itsName << '\n'
         << "  H5Parm:              " << itsH5ParmName << '\n'
         << "  solint:              " << itsSolInt << '\n'
         << "  nchan:               " << itsNChan << '\n'
@@ -468,8 +487,9 @@ namespace DP3 {
         << "  step size:           " << itsMultiDirSolver.get_step_size() << '\n'
         << "  mode (constraints):  " << GainCal::calTypeToString(itsMode) << '\n'
         << "  coreconstraint:      " << itsCoreConstraint << '\n'
-  << "  smoothnessconstraint:" << itsSmoothnessConstraint << '\n'
-        << "  approximate fitter:  " << itsApproximateTEC << '\n';
+        << "  smoothnessconstraint:" << itsSmoothnessConstraint << '\n'
+        << "  approximate fitter:  " << itsApproximateTEC << '\n'
+        << "  subtract model:      " << itsSubtract << '\n';
       for (uint i=0; i<itsPredictSteps.size(); ++i) {
         itsPredictSteps[i].show(os);
       }
@@ -563,6 +583,10 @@ namespace DP3 {
 
     void DDECal::doSolve ()
     {
+      for (uint constraint_num = 0; constraint_num < itsConstraints.size(); ++constraint_num) {
+        itsConstraints[constraint_num]->SetWeights(itsWeights);
+      }
+      
       if(itsFullMatrixMinimalization)
         initializeFullMatrixSolutions();
       else
@@ -572,16 +596,17 @@ namespace DP3 {
       MultiDirSolver::SolveResult solveResult;
       if(itsFullMatrixMinimalization)
       {
-        solveResult = itsMultiDirSolver.processFullMatrix(itsDataPtrs, itsModelDataPtrs,
-          itsSols[itsTimeStep/itsSolInt],
-    itsAvgTime / itsSolInt, itsStatStream.get());
+        solveResult = itsMultiDirSolver.processFullMatrix(itsDataPtrs, itsWeightPtrs, itsModelDataPtrs, itsSols[itsTimeStep/itsSolInt], itsAvgTime / itsSolInt, itsStatStream.get());
       }
       else {
-        solveResult = itsMultiDirSolver.processScalar(itsDataPtrs, itsModelDataPtrs,
-          itsSols[itsTimeStep/itsSolInt],
-    itsAvgTime / itsSolInt, itsStatStream.get());
+        solveResult = itsMultiDirSolver.processScalar(itsDataPtrs, itsWeightPtrs, itsModelDataPtrs, itsSols[itsTimeStep/itsSolInt], itsAvgTime / itsSolInt, itsStatStream.get());
       }
       itsTimerSolve.stop();
+
+      if(itsSubtract)
+      {
+        subtractCorrectedModel(itsFullMatrixMinimalization);
+      }
 
       itsNIter[itsTimeStep/itsSolInt] = solveResult.iterations;
       itsNApproxIter[itsTimeStep/itsSolInt] = solveResult.constraintIterations;
@@ -597,21 +622,39 @@ namespace DP3 {
       if (someConstraintHasResult) {
         itsConstraintSols[itsTimeStep/itsSolInt]=solveResult._results;
       }
+      
+      itsTimer.stop();
+
+      for(size_t time=0; time<=itsStepInSolInt; ++time)
+      {
+        // Restore the weights and flags
+        itsBufs[time].getFlags().assign( itsOriginalFlags[time] );
+        itsBufs[time].getWeights().assign( itsOriginalWeights[time] );
+        // Push data (possibly changed) to next step
+        getNextStep()->process(itsBufs[time]);
+      }
+      
+      itsTimer.start();
     }
 
     bool DDECal::process (const DPBuffer& bufin)
     {
       itsTimer.start();
 
-      itsBufs[itsStepInSolInt].copy(bufin);
-      itsDataPtrs[itsStepInSolInt] = itsBufs[itsStepInSolInt].getData().data();
-
       // Fetch inputs because parallel PredictSteps should not read it from disk
       itsInput->fetchUVW(bufin, itsBufs[itsStepInSolInt], itsTimer);
       itsInput->fetchWeights(bufin, itsBufs[itsStepInSolInt], itsTimer);
       itsInput->fetchFullResFlags(bufin, itsBufs[itsStepInSolInt], itsTimer);
 
-      // UVW flagging happens on a copy of the buffer, so these flags are not written
+      itsBufs[itsStepInSolInt].copy(bufin);
+      itsOriginalFlags[itsStepInSolInt].assign( bufin.getFlags() );
+      itsOriginalWeights[itsStepInSolInt].assign( bufin.getWeights() );
+      
+      itsDataPtrs[itsStepInSolInt] = itsBufs[itsStepInSolInt].getData().data();
+      itsWeightPtrs[itsStepInSolInt] = itsBufs[itsStepInSolInt].getWeights().data();
+      
+      // UVW flagging happens on the copy of the buffer
+      // These flags are later restored and therefore not written
       itsUVWFlagStep.process(itsBufs[itsStepInSolInt]);
 
       itsTimerPredict.start();
@@ -622,9 +665,11 @@ namespace DP3 {
         itsModelDataPtrs[itsStepInSolInt][0] = itsModelData[itsStepInSolInt].data();
       } else {
         if(itsThreadPool == nullptr)
-          itsThreadPool.reset(new ThreadPool(OpenMP::maxThreads()));
+          itsThreadPool.reset(new ThreadPool(NThreads()));
+        std::mutex measuresMutex;
         for(DP3::DPPP::Predict& predict : itsPredictSteps)
-          predict.setThreadPool(*itsThreadPool);
+          predict.setThreadData(*itsThreadPool, measuresMutex);
+        
         itsThreadPool->For(0, itsPredictSteps.size(), [&](size_t dir, size_t /*thread*/) {
           itsPredictSteps[dir].process(itsBufs[itsStepInSolInt]);
           itsModelDataPtrs[itsStepInSolInt][dir] =
@@ -638,31 +683,28 @@ namespace DP3 {
       const size_t nCr = 4;
       
       size_t nchanblocks = itsChanBlockFreqs.size();
-      size_t chanblock = 0;
 
       double weightFactor = 1./(nCh*(info().nantenna()-1)*nCr*itsSolInt);
 
-      for (size_t ch=0; ch<nCh; ++ch) {
-        if (ch == itsChanBlockStart[chanblock+1]) {
-          chanblock++;
-        }
-        for (size_t bl=0; bl<nBl; ++bl) {
+      for (size_t bl=0; bl<nBl; ++bl) {
+        size_t 
+          chanblock = 0,
+          ant1 = info().getAnt1()[bl],
+          ant2 = info().getAnt2()[bl];
+        for (size_t ch=0; ch<nCh; ++ch) {
+          if (ch == itsChanBlockStart[chanblock+1]) {
+            chanblock++;
+          }
           for (size_t cr=0; cr<nCr; ++cr) {
-            if (itsBufs[itsStepInSolInt].getFlags().data()[bl*nCr*nCh+ch*nCr+cr]) {
-              // Flagged points: set data and model to 0
-              itsDataPtrs[itsStepInSolInt][bl*nCr*nCh+ch*nCr+cr] = 0;
-              for (size_t dir=0; dir<itsModelDataPtrs[0].size(); ++dir) {
-                itsModelDataPtrs[itsStepInSolInt][dir][bl*nCr*nCh+ch*nCr+cr] = 0;
-              }
+            const size_t index = (bl*nCh+ch)*nCr+cr;
+            if (itsBufs[itsStepInSolInt].getFlags().data()[index]) {
+              // Flagged points: set weight to 0
+              itsWeightPtrs[itsStepInSolInt][index] = 0;
             } else {
-              // Premultiply non-flagged data with sqrt(weight)
-              double weight = itsBufs[itsStepInSolInt].getWeights().data()[bl*nCr*nCh+ch*nCr+cr];
-              itsDataPtrs[itsStepInSolInt][bl*nCr*nCh+ch*nCr+cr] *= sqrt(weight);
-              itsWeights[info().getAnt1()[bl]*nchanblocks + chanblock] += weight;
-              itsWeights[info().getAnt2()[bl]*nchanblocks + chanblock] += weight;
-              for (size_t dir=0; dir<itsModelDataPtrs[0].size(); ++dir) {
-                itsModelDataPtrs[itsStepInSolInt][dir][bl*nCr*nCh+ch*nCr+cr] *= sqrt(weight);
-              }
+              // Add this weight to both involved antennas
+              double weight = itsBufs[itsStepInSolInt].getWeights().data()[index];
+              itsWeights[ant1*nchanblocks + chanblock] += weight;
+              itsWeights[ant2*nchanblocks + chanblock] += weight;
             }
           }
         }
@@ -676,11 +718,8 @@ namespace DP3 {
 
       itsAvgTime += itsAvgTime + bufin.getTime();
 
-      if (itsStepInSolInt==itsSolInt-1) {
-        for (uint constraint_num = 0; constraint_num < itsConstraints.size(); ++constraint_num) {
-          itsConstraints[constraint_num]->SetWeights(itsWeights);
-        }
-
+      if (itsStepInSolInt==itsSolInt-1)
+      {
         doSolve();
 
         // Clean up, prepare for next iteration
@@ -697,12 +736,11 @@ namespace DP3 {
       itsTimeStep++;
       itsTimer.stop();
 
-      getNextStep()->process(bufin);
-
       return false;
     }
 
-    void DDECal::writeSolutions() {
+    void DDECal::writeSolutions()
+    {
       itsTimer.start();
       itsTimerWrite.start();
 
@@ -830,7 +868,6 @@ namespace DP3 {
             antennaNames[i]=info().antennaNames()[i];
           }
           soltab.setAntennas(antennaNames);
-    
           soltab.setSources(getDirectionNames());
 
           if (nPol>1) {
@@ -838,7 +875,6 @@ namespace DP3 {
           }
    
           soltab.setFreqs(itsChanBlockFreqs);
-
           soltab.setTimes(solTimes);
         } // solnums loop
       } else {
@@ -966,11 +1002,9 @@ namespace DP3 {
       itsTimer.start();
 
       if (itsStepInSolInt!=0) {
-        //shrink itsDataPtrs, itsModelDataPtrs
-        std::vector<casacore::Complex*>(itsDataPtrs.begin(),
-            itsDataPtrs.begin()+itsStepInSolInt).swap(itsDataPtrs);
-        std::vector<std::vector<casacore::Complex*> >(itsModelDataPtrs.begin(),
-                    itsModelDataPtrs.begin()+itsStepInSolInt).swap(itsModelDataPtrs);
+        itsDataPtrs.resize(itsStepInSolInt);
+        itsWeightPtrs.resize(itsStepInSolInt);
+        itsModelDataPtrs.resize(itsStepInSolInt);
 
         doSolve();
       }
@@ -982,6 +1016,57 @@ namespace DP3 {
       // Let the next steps finish.
       getNextStep()->finish();
     }
-
+    
+    void DDECal::subtractCorrectedModel(bool fullJones)
+    {
+      // Our original data & modeldata is still in the data buffers (the solver
+      // doesn't change those). Here we apply the solutions to all the model data
+      // directions and subtract them from the data.
+      std::vector<std::vector<DComplex>>& solutions = itsSols[itsTimeStep/itsSolInt];
+      const size_t nBl = info().nbaselines();
+      const size_t nCh = info().nchan();
+      const size_t nDir = itsDirections.size();
+      for(size_t time=0; time<=itsStepInSolInt; ++time)
+      {
+        std::complex<float>* data = itsDataPtrs[time];
+        std::vector<std::complex<float>*>& modelData = itsModelDataPtrs[time];
+        for (size_t bl=0; bl<nBl; ++bl)
+        {
+          size_t 
+            chanblock = 0,
+            ant1 = info().getAnt1()[bl],
+            ant2 = info().getAnt2()[bl];
+            
+          for (size_t ch=0; ch<nCh; ++ch)
+          {
+            MC2x2 value(MC2x2::Zero());
+            if (ch == itsChanBlockStart[chanblock+1])
+            {
+              chanblock++;
+            }
+            const size_t index = (bl*nCh+ch)*4;
+            for (size_t dir=0; dir!=nDir; ++dir)
+            {
+              if(fullJones)
+              {
+                MC2x2
+                  sol1(&solutions[chanblock][(ant1*nDir + dir)*4]),
+                  sol2(&solutions[chanblock][(ant2*nDir + dir)*4]);
+                  value +=
+                    sol1.Multiply(MC2x2(&modelData[dir][index])).MultiplyHerm(sol2);
+              }
+              else {
+                std::complex<double> solfactor(
+                  solutions[chanblock][ant1*nDir + dir] * std::conj(solutions[chanblock][ant2*nDir + dir]));
+                for (size_t cr=0; cr<4; ++cr)
+                  value[cr] += solfactor * std::complex<double>(modelData[dir][index + cr]);
+              }
+            }
+            for (size_t cr=0; cr<4; ++cr)
+              data[index + cr] -= value[cr];
+          } // channel loop
+        } //bl loop
+      } //time loop
+    }
   } //# end namespace
 }

@@ -29,6 +29,7 @@
 #include "DPInfo.h"
 #include "MSReader.h"
 
+#include "../Common/ParallelFor.h"
 #include "../Common/ParameterSet.h"
 #include "../Common/StringUtil.h"
 
@@ -108,9 +109,12 @@ namespace DP3 {
                          parset.getString(defaultPrefix + "correction"));
         if(itsSolTabName == "fulljones")
         {
-          itsSolTab = itsH5Parm.getSolTab("amplitude000");
-          itsSolTab2 = itsH5Parm.getSolTab("phase000");
-          itsSolTabName = "amplitude000, phase000"; // this is only so that show() shows these tables
+          std::vector<string> solTabs = parset.getStringVector(prefix + "soltab", std::vector<string>{"amplitude000", "phase000"});
+          if(solTabs.size() != 2)
+            throw std::runtime_error("The soltab parameter requires two soltabs for fulljones correction (amplitude and phase)");
+          itsSolTab = itsH5Parm.getSolTab(solTabs[0]);
+          itsSolTab2 = itsH5Parm.getSolTab(solTabs[1]);
+          itsSolTabName = solTabs[0] + ", " + solTabs[1]; // this is only so that show() shows these tables
           itsCorrectType = FULLJONES;
         }
         else {
@@ -337,7 +341,7 @@ namespace DP3 {
         os << "  H5Parm:         " << itsParmDBName << '\n';
         os << "    SolSet:       " << itsH5Parm.getSolSetName() << '\n';
         os << "    SolTab:       " << itsSolTabName << '\n';
-        os << "  Direction:       " << itsDirection << '\n';
+        os << " Direction:       " << itsDirection << '\n';
       } else {
         os << "  parmdb:         " << itsParmDBName << '\n';
       }
@@ -360,13 +364,13 @@ namespace DP3 {
       os << " OneApplyCal " << itsName << '\n';
     }
 
-    bool OneApplyCal::process (const DPBuffer& bufin)
+    bool OneApplyCal::process (const DPBuffer& bufin, std::mutex* hdf5Mutex)
     {
       itsTimer.start();
       itsBuffer.copy (bufin);
 
       if (bufin.getTime() > itsLastTime) {
-        updateParms(bufin.getTime());
+        updateParms(bufin.getTime(), hdf5Mutex);
         itsTimeStep=0;
       }
       else {
@@ -385,8 +389,8 @@ namespace DP3 {
 
       size_t nchan = itsBuffer.getData().shape()[1];
 
-#pragma omp parallel for
-      for (size_t bl=0; bl<nbl; ++bl) {
+      ParallelFor<size_t> loop(NThreads());
+      loop.Run(0, nbl, [&](size_t bl, size_t /*thread*/) {
         for (size_t chan=0;chan<nchan;chan++) {
           uint timeFreqOffset=(itsTimeStep*info().nchan())+chan;
           uint antA = info().getAnt1()[bl];
@@ -408,7 +412,7 @@ namespace DP3 {
                        bl, chan, itsUpdateWeights, itsFlagCounter);
           }
         }
-      }
+      });
 
       itsTimer.stop();
       getNextStep()->process(itsBuffer);
@@ -437,7 +441,7 @@ namespace DP3 {
       } 
     }
 
-    void OneApplyCal::updateParms (const double bufStartTime)
+    void OneApplyCal::updateParms (const double bufStartTime, std::mutex* hdf5Mutex)
     {
       uint numAnts = info().antennaNames().size();
 
@@ -474,8 +478,10 @@ namespace DP3 {
 
       // Fill parmvalues here, get raw data from H5Parm or ParmDB
       if (itsUseH5Parm) {
-#pragma omp critical(updateH5ParmValues)
-{
+        std::unique_lock<std::mutex> lock;
+        if(hdf5Mutex != nullptr)
+          lock = std::unique_lock<std::mutex>(*hdf5Mutex);
+        
         // TODO: understand polarization etc.
         //  assert(itsParmExprs.size()==1 || itsParmExprs.size()==2);
 
@@ -531,7 +537,6 @@ namespace DP3 {
             }
           }
         }
-} // End pragma omp critical
       } else { // Use ParmDB
         for (uint parmExprNum = 0; parmExprNum<itsParmExprs.size();++parmExprNum) {
           // parmMap contains parameter values for all antennas

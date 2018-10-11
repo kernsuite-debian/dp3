@@ -34,7 +34,7 @@ public:
   
   /** Propagate weights to the phase fitters */
   virtual void SetWeights(const std::vector<double>& weights) final override;
-
+  
 protected:
   virtual void initializeChild() { }
   

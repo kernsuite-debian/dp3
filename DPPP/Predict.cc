@@ -28,7 +28,6 @@
 #include "../Common/ParameterSet.h"
 #include "../Common/ThreadPool.h"
 #include "../Common/Timer.h"
-#include "../Common/OpenMP.h"
 #include "../Common/StreamUtil.h"
 
 #include "../ParmDB/ParmDBMeta.h"
@@ -204,18 +203,18 @@ namespace DP3 {
       itsUVWSplitIndex = nsetupSplitUVW (info().nantenna(), info().getAnt1(),
                                          info().getAnt2());
 
-      itsModelVis.resize(OpenMP::maxThreads());
-      itsModelVisPatch.resize(OpenMP::maxThreads());
+      itsModelVis.resize(NThreads());
+      itsModelVisPatch.resize(NThreads());
 #ifdef HAVE_LOFAR_BEAM
-      itsBeamValues.resize(OpenMP::maxThreads());
-      itsAntBeamInfo.resize(OpenMP::maxThreads());
-#endif
+      itsBeamValues.resize(NThreads());
+      itsAntBeamInfo.resize(NThreads());
       // Create the Measure ITRF conversion info given the array position.
       // The time and direction are filled in later.
-      itsMeasConverters.resize(OpenMP::maxThreads());
-      itsMeasFrames.resize(OpenMP::maxThreads());
+      itsMeasConverters.resize(NThreads());
+      itsMeasFrames.resize(NThreads());
+#endif
 
-      for (uint thread=0;thread<OpenMP::maxThreads();++thread) {
+      for (uint thread=0; thread<NThreads(); ++thread) {
         if (itsStokesIOnly) {
           itsModelVis[thread].resize(1,nCh,nBl);
         } else {
@@ -253,16 +252,15 @@ namespace DP3 {
              itsOperation=="subtract");
     }
 
-
     void Predict::show (std::ostream& os) const
     {
-      os << "Predict " << itsName << endl;
-      os << "  sourcedb:           " << itsSourceDBName << endl;
-      os << "   number of patches: " << itsPatchList.size() << endl;
-      os << "   number of sources: " << itsSourceList.size() << endl;
-      os << "   all unpolarized:   " << boolalpha << itsStokesIOnly << endl;
+      os << "Predict " << itsName << '\n';
+      os << "  sourcedb:           " << itsSourceDBName << '\n';
+      os << "   number of patches: " << itsPatchList.size() << '\n';
+      os << "   number of sources: " << itsSourceList.size() << '\n';
+      os << "   all unpolarized:   " << boolalpha << itsStokesIOnly << '\n';
 #ifdef HAVE_LOFAR_BEAM
-      os << "  apply beam:         " << boolalpha << itsApplyBeam << endl;
+      os << "  apply beam:         " << boolalpha << itsApplyBeam << '\n';
       if (itsApplyBeam) {
         os << "   mode:              ";
         if (itsBeamMode==ApplyBeam::DEFAULT)
@@ -270,13 +268,13 @@ namespace DP3 {
         else if (itsBeamMode==ApplyBeam::ARRAY_FACTOR)
           os<<"array_factor";
         else os<<"element";
-        os << endl;
-        os << "   use channelfreq:   " << boolalpha << itsUseChannelFreq << endl;
-        os << "   one beam per patch:" << boolalpha << itsOneBeamPerPatch << endl;
+        os << '\n';
+        os << "   use channelfreq:   " << boolalpha << itsUseChannelFreq << '\n';
+        os << "   one beam per patch:" << boolalpha << itsOneBeamPerPatch << '\n';
       }
 #endif
-      os << "  operation:          "<<itsOperation << endl;
-      os << "  threads:            "<<OpenMP::maxThreads()<<endl;
+      os << "  operation:          "<<itsOperation << '\n';
+      os << "  threads:            "<<NThreads()<<'\n';
       if (itsDoApplyCal) {
         itsApplyCalStep.show(os);
       }
@@ -286,7 +284,7 @@ namespace DP3 {
     {
       os << "  ";
       FlagCounter::showPerc1 (os, itsTimer.getElapsed(), duration);
-      os << " Predict " << itsName << endl;
+      os << " Predict " << itsName << '\n';
     }
 
     bool Predict::process (const DPBuffer& bufin)
@@ -313,17 +311,20 @@ namespace DP3 {
       //Set up directions for beam evaluation
       LOFAR::StationResponse::vector3r_t refdir, tiledir;
 
-      if (itsApplyBeam) {
-        for (uint thread=0;thread<OpenMP::maxThreads();++thread) {
-#pragma omp critical(initialmeasuresconversion)
-          {
+      if (itsApplyBeam)
+      {
+        // Because multiple predict steps might be predicting simultaneously, and
+        // Casacore is not thread safe, this needs synchronization.
+        std::unique_lock<std::mutex> lock;
+        if(itsMeasuresMutex != nullptr)
+          lock = std::unique_lock<std::mutex>(*itsMeasuresMutex);
+        for (uint thread=0;thread<NThreads();++thread) {
           itsMeasFrames[thread].resetEpoch (MEpoch(MVEpoch(time/86400),
                                                    MEpoch::UTC));
           //Do a conversion on all threads, because converters are not
           //thread safe and apparently need to be used at least once
-          refdir  = dir2Itrf(info().delayCenter(),itsMeasConverters[thread]);
-          tiledir = dir2Itrf(info().tileBeamDir(),itsMeasConverters[thread]);
-          }
+          refdir  = dir2Itrf(info().delayCenter(), itsMeasConverters[thread]);
+          tiledir = dir2Itrf(info().tileBeamDir(), itsMeasConverters[thread]);
         }
       }
 #endif
@@ -334,7 +335,7 @@ namespace DP3 {
       {
         // If no ThreadPool was specified, we create a temporary one just
         // for executation of this part.
-        localThreadPool.reset(new ThreadPool(OpenMP::maxThreads()));
+        localThreadPool.reset(new ThreadPool(NThreads()));
         pool = localThreadPool.get();
       }
       std::vector<Simulator> simulators;
@@ -383,7 +384,7 @@ namespace DP3 {
       // Add all thread model data to one buffer
       itsTempBuffer.getData()=Complex();
       Complex* tdata=itsTempBuffer.getData().data();
-      for (uint thread=0;thread<OpenMP::maxThreads();++thread) {
+      for (uint thread=0; thread<pool->NThreads(); ++thread) {
         if (itsStokesIOnly) {
           for (uint i=0,j=0;i<nSamples;i+=nCr,j++) {
             tdata[i] += itsModelVis[thread].data()[j];
@@ -397,7 +398,10 @@ namespace DP3 {
 
       // Call ApplyCal step
       if (itsDoApplyCal) {
-        itsApplyCalStep.process(itsTempBuffer);
+        if(itsMeasuresMutex == nullptr)
+          itsApplyCalStep.process(itsTempBuffer);
+        else
+          itsApplyCalStep.process(itsTempBuffer, itsMeasuresMutex);
         itsTempBuffer=itsResultStep->get();
         tdata=itsTempBuffer.getData().data();
       }
@@ -444,7 +448,7 @@ namespace DP3 {
       MDirection dir (MVDirection(patch->position()[0],
                                   patch->position()[1]),
                       MDirection::J2000);
-      LOFAR::StationResponse::vector3r_t srcdir = dir2Itrf(dir,itsMeasConverters[thread]);
+      LOFAR::StationResponse::vector3r_t srcdir = dir2Itrf(dir, itsMeasConverters[thread]);
 
       float* dummyweight = 0;
 
@@ -458,7 +462,6 @@ namespace DP3 {
                      itsModelVis[thread].data()+nSamples,
                      data0,
                      itsModelVis[thread].data(), std::plus<dcomplex>());
-      //threadoutput<<"thread "<<thread<<" has "<<itsModelVis[thread]<<endl;
       itsModelVisPatch[thread]=dcomplex();
     }
 #endif
