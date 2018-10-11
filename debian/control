@@ -20,12 +20,20 @@ Build-Depends:
  libcfitsio-dev,
  libarmadillo-dev,
  aoflagger-dev,
- lofar-dev
+ lofar-dev,
+ python-all,
+ dh-python
 Standards-Version: 3.9.8
 Homepage: https://github.com/lofar-astron/DP3
+X-Python-Version: >= 2.6
+
+Package: python-dp3
+Architecture: any
+Depends: ${misc:Depends}, ${shlibs:Depends}, ${python:Depends}
+Description: streaming processing pipeline for radio data (python 2)
 
 Package: dp3
 Architecture: any
 Multi-Arch: foreign
 Depends: ${misc:Depends}, ${shlibs:Depends}
-Description: streaming processing pipeline for radio interferometric data
+Description: streaming processing pipeline for radio data
