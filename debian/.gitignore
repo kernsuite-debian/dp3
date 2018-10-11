@@ -3,3 +3,7 @@
 *.substvars
 dp3/
 files
+*.debhelper
+python-dp3/                  
+tmp/                         
+
