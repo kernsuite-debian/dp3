@@ -1,10 +1,6 @@
 #include "TECConstraint.h"
 
-#ifdef AOPROJECT
-#include "omptools.h"
-#else
-#include "../Common/OpenMP.h"
-#endif
+#include "../Common/ParallelFor.h"
 
 TECConstraintBase::TECConstraintBase(Mode mode) :
   _mode(mode),
@@ -13,13 +9,7 @@ TECConstraintBase::TECConstraintBase(Mode mode) :
 }
 
 void TECConstraintBase::initialize(const double* frequencies) {
-  _phaseFitters.resize(
-#ifdef AOPROJECT
-      omp_get_max_threads()
-#else
-      DP3::OpenMP::maxThreads()
-#endif
-   );
+  _phaseFitters.resize(_nThreads);
 
   for(size_t i=0; i!=_phaseFitters.size(); ++i)
   {
@@ -37,13 +27,7 @@ void TECConstraintBase::SetWeights(const std::vector<double>& weights) {
 
 void ApproximateTECConstraint::initializeChild()
 {
-  _pwFitters.resize(
-#ifdef AOPROJECT
-      omp_get_max_threads()
-#else
-      DP3::OpenMP::maxThreads()
-#endif
-   );
+  _pwFitters.resize(_nThreads);
   _threadData.resize(_pwFitters.size());
   _threadFittedData.resize(_pwFitters.size());
   _threadWeights.resize(_pwFitters.size());
@@ -122,16 +106,10 @@ std::vector<Constraint::Result> TECConstraint::Apply(
   // Divide out the reference antenna
   applyReferenceAntenna(solutions);
   
-#pragma omp parallel for
-  for(size_t solutionIndex = 0; solutionIndex<_nAntennas*_nDirections; ++solutionIndex)
+  DP3::ParallelFor<size_t> loop(_nThreads);
+  loop.Run(0, _nAntennas*_nDirections, [&](size_t solutionIndex, size_t thread)
   {
     size_t antennaIndex = solutionIndex/_nDirections;
-    size_t thread =
-#ifdef AOPROJECT
-        omp_get_thread_num();
-#else
-        DP3::OpenMP::threadNum();
-#endif
 
     // Flag channels where calibration yielded inf or nan
     double weightSum = 0.0;
@@ -168,7 +146,7 @@ std::vector<Constraint::Result> TECConstraint::Apply(
     {
       solutions[ch][solutionIndex] = std::polar<double>(1.0, _phaseFitters[thread].PhaseData()[ch]);
     }
-  }
+  });
 
   return res;
 }
@@ -182,15 +160,10 @@ std::vector<Constraint::Result> ApproximateTECConstraint::Apply(
   else {
     applyReferenceAntenna(solutions);
     
-#pragma omp parallel for
-    for(size_t solutionIndex = 0; solutionIndex<_nAntennas*_nDirections; ++solutionIndex)
+    DP3::ParallelFor<size_t> loop(_nThreads);
+    loop.Run(0, _nAntennas*_nDirections, [&](size_t solutionIndex, size_t thread)
     {
       size_t antennaIndex = solutionIndex/_nDirections;
-#ifdef AOPROJECT
-      size_t thread = omp_get_thread_num();
-#else
-      size_t thread = DP3::OpenMP::threadNum();
-#endif
       std::vector<double>& data = _threadData[thread];
       std::vector<double>& fittedData = _threadFittedData[thread];
       std::vector<double>& weights = _threadWeights[thread];
@@ -216,7 +189,7 @@ std::vector<Constraint::Result> ApproximateTECConstraint::Apply(
       {
         solutions[ch][solutionIndex] = std::polar<double>(1.0, fittedData[ch]);
       }
-    }
+    });
 
     return std::vector<Constraint::Result>();
   }
