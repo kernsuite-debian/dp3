@@ -22,7 +22,8 @@ Build-Depends:
  aoflagger-dev,
  lofar-dev,
  python-all,
- dh-python
+ dh-python,
+ libboost-signals-dev
 Standards-Version: 3.9.8
 Homepage: https://github.com/lofar-astron/DP3
 X-Python-Version: >= 2.6
