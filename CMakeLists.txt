@@ -4,7 +4,6 @@ cmake_minimum_required(VERSION 3.9)
 
 project(DP3)
 
-# Casacore has a separate CMake file in this directory
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/CMake)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++11")
@@ -18,6 +17,8 @@ include_directories(${CASACORE_INCLUDE_DIR})
 # Add old casacore include directory because LOFAR beam library did
 # not use the casacore/ prefix in the includes until 3.2 (Sep '18)
 include_directories(${CASACORE_INCLUDE_DIR}/casacore)
+
+find_package(Threads REQUIRED)
 
 #Prevent accidentally finding old BoostConfig.cmake file from casapy
 set(Boost_NO_BOOST_CMAKE ON)
@@ -160,26 +161,35 @@ set(EXTRA_LIBRARIES ${EXTRA_LIBRARIES}
   ${CASACORE_LIBRARIES}
   ${Boost_DATE_TIME_LIBRARY} ${Boost_FILESYSTEM_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${Boost_PYTHON_LIBRARY}
   ${EXTRA_LIBRARIES}
-  ${PYTHON_LIBRARIES})
+  ${PYTHON_LIBRARIES}
+  Threads::Threads)
   
 #
 # DDECal dependencies
 #
 find_package(Armadillo)
 if(${ARMADILLO_FOUND})
-  include_directories(${ARMADILLO_INCLUDE_DIRS})
-  set(EXTRA_LIBRARIES ${EXTRA_LIBRARIES} ${ARMADILLO_LIBRARIES})
-  add_library(DDECal_OBJ OBJECT
-    DDECal/DDECal.cc DDECal/Register.cc DDECal/Stopwatch.cc
-    DDECal/KLFitter.cc DDECal/MultiDirSolver.cc
-    DDECal/Constraint.cc DDECal/PiercePoint.cc
-    DDECal/ScreenConstraint.cc DDECal/SmoothnessConstraint.cc
-    DDECal/TECConstraint.cc DDECal/RotationConstraint.cc
-    DDECal/RotationAndDiagonalConstraint.cc)
-  set(DDECAL_OBJECT $<TARGET_OBJECTS:DDECal_OBJ>)
+  add_definitions(-DHAVE_ARMADILLO)
+  set(DDE_ARMADILLO_FILES
+    DDECal/KLFitter.cc 
+    DDECal/PiercePoint.cc 
+    DDECal/ScreenConstraint.cc)
 else()
-  message(WARNING "Armadillo was not found, not including DDECal")
+  message(WARNING "Armadillo was not found, not including screenfitter inside DDECal")
+  set(DDE_ARMADILLO_FILES)
 endif()
+
+include_directories(${ARMADILLO_INCLUDE_DIRS})
+set(EXTRA_LIBRARIES ${EXTRA_LIBRARIES} ${ARMADILLO_LIBRARIES})
+add_library(DDECal_OBJ OBJECT
+  DDECal/DDECal.cc DDECal/Register.cc DDECal/Stopwatch.cc
+  DDECal/MultiDirSolver.cc
+  DDECal/Constraint.cc
+  DDECal/SmoothnessConstraint.cc
+  DDECal/TECConstraint.cc DDECal/RotationConstraint.cc
+  DDECal/RotationAndDiagonalConstraint.cc
+  ${DDE_ARMADILLO_FILES})
+set(DDECAL_OBJECT $<TARGET_OBJECTS:DDECal_OBJ>)
 
 set(DPPP_GLOBAL_SOVERSION 2)
 
