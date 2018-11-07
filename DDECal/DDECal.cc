@@ -32,11 +32,14 @@
 #include "../DPPP/Version.h"
 
 #include "Matrix2x2.h"
-#include "ScreenConstraint.h"
 #include "TECConstraint.h"
 #include "RotationConstraint.h"
 #include "RotationAndDiagonalConstraint.h"
 #include "SmoothnessConstraint.h"
+
+#ifdef HAVE_ARMADILLO
+#include "ScreenConstraint.h"
+#endif
 
 #include "../ParmDB/ParmDB.h"
 #include "../ParmDB/ParmValue.h"
@@ -128,15 +131,15 @@ namespace DP3 {
           string sourceDBName = parset.getString(prefix+"sourcedb");
           BBS::SourceDB sourceDB(BBS::ParmDBMeta("", sourceDBName), false);
           vector<string> patchNames = makePatchList(sourceDB, vector<string>());
-          itsDirections.resize(patchNames.size());
+          itsDirections.reserve(patchNames.size());
           for (uint i=0; i<patchNames.size(); ++i) {
-            itsDirections[i] = vector<string>(1, patchNames[i]);
+            itsDirections.emplace_back(1, patchNames[i]);
           }
         } else {
-          itsDirections.resize(strDirections.size());
+          itsDirections.reserve(strDirections.size());
           for (uint i=0; i<strDirections.size(); ++i) {
             ParameterValue dirStr(strDirections[i]);
-            itsDirections[i] = dirStr.getStringVector();
+            itsDirections.emplace_back(dirStr.getStringVector());
           }
         }
       }
@@ -243,10 +246,14 @@ namespace DP3 {
           itsFullMatrixMinimalization = false;
           break;
         case GainCal::TECSCREEN:
+#ifdef HAVE_ARMADILLO
           itsConstraints.push_back(std::unique_ptr<Constraint>(
                     new ScreenConstraint(parset, prefix+"tecscreen.")));
           itsMultiDirSolver.set_phase_only(true);
           itsFullMatrixMinimalization = false;
+#else
+          throw std::runtime_error("Can not use TEC screen: Armadillo is not available. Recompile DP3 with Armadillo.");
+#endif
           break;
         case GainCal::ROTATIONANDDIAGONAL:
           itsConstraints.push_back(std::unique_ptr<Constraint>(
@@ -267,14 +274,12 @@ namespace DP3 {
     void DDECal::initializePredictSteps(const ParameterSet& parset, const string& prefix)
     {
       const size_t nDir = itsDirections.size();
-      if (itsUseModelColumn) {
-        assert(nDir == 1);
-      } else {
-        itsPredictSteps.resize(nDir);
-        for (size_t dir=0; dir<nDir; ++dir) {
-          itsPredictSteps[dir] = Predict(itsInput, parset, prefix, itsDirections[dir]);
-          itsPredictSteps[dir].setNThreads(NThreads());
-        }
+      if(nDir == 0)
+        throw std::runtime_error("DDECal initialized with 0 directions: something is wrong with your parset or your sourcedb");
+      itsPredictSteps.reserve(nDir);
+      for (size_t dir=0; dir<nDir; ++dir) {
+        itsPredictSteps.emplace_back(itsInput, parset, prefix, itsDirections[dir]);
+        itsPredictSteps[dir].setNThreads(NThreads());
       }
     }
 
@@ -421,6 +426,7 @@ namespace DP3 {
           coreConstraint->initialize(coreAntennaIndices);
         }
         
+#ifdef HAVE_ARMADILLO
         ScreenConstraint* screenConstraint = dynamic_cast<ScreenConstraint*>(itsConstraints[i].get());
         if(screenConstraint != 0)
         {
@@ -450,6 +456,7 @@ namespace DP3 {
           screenConstraint->setCoreAntennas(coreAntennaIndices);
           screenConstraint->setOtherAntennas(otherAntennaIndices);
         }
+#endif
         
         TECConstraintBase* tecConstraint = dynamic_cast<TECConstraintBase*>(itsConstraints[i].get());
         if(tecConstraint != nullptr)
@@ -583,8 +590,8 @@ namespace DP3 {
 
     void DDECal::doSolve ()
     {
-      for (uint constraint_num = 0; constraint_num < itsConstraints.size(); ++constraint_num) {
-        itsConstraints[constraint_num]->SetWeights(itsWeights);
+      for (std::unique_ptr<Constraint>& constraint : itsConstraints) {
+        constraint->SetWeights(itsWeights);
       }
       
       if(itsFullMatrixMinimalization)
