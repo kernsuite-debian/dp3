@@ -106,25 +106,29 @@ private:
                              std::vector<Matrix>& gTimesCs,
                              std::vector<Matrix>& vs,
                              const std::vector<DComplex>& solutions,
-                             std::vector<DComplex>& nextSolutions,
-                             const std::vector<std::vector<Complex>>& data,
-                             const std::vector<std::vector<std::vector<Complex>>>& modelData);
+                             std::vector<DComplex>& nextSolutions);
                              
   void performFullMatrixIteration(size_t channelBlockIndex,
                              std::vector<Matrix>& gTimesCs,
                              std::vector<Matrix>& vs,
                              const std::vector<DComplex>& solutions,
-                             std::vector<DComplex>& nextSolutions,
-                             const std::vector<std::vector<Complex>>& data,
-                             const std::vector<std::vector<std::vector<Complex>>>& modelData);
+                             std::vector<DComplex>& nextSolutions);
 
   void makeStep(const std::vector<std::vector<DComplex> >& solutions,
     std::vector<std::vector<DComplex> >& nextSolutions) const;
 
   bool detectStall(size_t iteration, const std::vector<double>& stepMagnitudes) const;
                 
-  void makeSolutionsFinite(std::vector<std::vector<DComplex> >& solutions, size_t perPol) const;
-                
+  static void makeSolutionsFinite1pol(std::vector<std::vector<DComplex> >& solutions);
+  
+  static void makeSolutionsFinite4pol(std::vector<std::vector<DComplex> >& solutions);
+  
+  template<typename T>
+  static bool isfinite(const std::complex<T>& val)
+  {
+    return std::isfinite(val.real()) && std::isfinite(val.imag());
+  }
+  
   /**
    * Assign the solutions in nextSolutions to the solutions.
    * @returns whether the solutions have converged. Appends the current step magnitude to step_magnitudes
@@ -149,11 +153,6 @@ private:
   bool _detectStalling;
   bool _phaseOnly;
   std::vector<Constraint*> _constraints;
-
-  // Timers
-  Stopwatch _timerSolve;
-  Stopwatch _timerConstrain;
-  Stopwatch _timerFillMatrices;
 };
 
 #endif

@@ -108,7 +108,7 @@ namespace DP3 {
       // See if a selection on band needs to be done.
       // We assume that DATA_DESC_ID and SPW_ID map 1-1.
       if (itsSpw >= 0) {
-        DPLOG_INFO_STR (" MSReader selecting spectral window " + to_string(itsSpw) + " ...");
+        DPLOG_INFO_STR (" MSReader selecting spectral window " + std::to_string(itsSpw) + " ...");
         Table subset = itsSelMS (itsSelMS.col("DATA_DESC_ID") == itsSpw);
         // If not all is selected, use the selection.
         if (subset.nrow() < itsSelMS.nrow()) {
@@ -211,8 +211,10 @@ namespace DP3 {
     MSReader::~MSReader()
     {}
 
-    void MSReader::updateInfo (const DPInfo&)
-    {}
+    void MSReader::updateInfo (const DPInfo& dpInfo)
+    {
+      info().setNThreads(dpInfo.nThreads());
+    }
 
     std::string MSReader::msName() const
     {
@@ -459,6 +461,29 @@ namespace DP3 {
       // Test if the data column is present.
       if (tdesc.isColumn (itsDataColName)) {
         itsMissingData = false;
+        
+        // Read beam keywords of input datacolumn
+        ArrayColumn<Complex> dataCol(itsMS, itsDataColName);
+        if(dataCol.keywordSet().isDefined("LOFAR_APPLIED_BEAM_MODE"))
+        {
+          std::string mode = dataCol.keywordSet().asString("LOFAR_APPLIED_BEAM_MODE");
+          if(mode == "None")
+            info().setBeamCorrectionMode(NoBeamCorrection);
+          else {
+            if(mode == "Element")
+              info().setBeamCorrectionMode(ElementBeamCorrection);
+            else if(mode == "ArrayFactor")
+              info().setBeamCorrectionMode(ArrayFactorBeamCorrection);
+            else if(mode == "Full")
+              info().setBeamCorrectionMode(FullBeamCorrection);
+            
+            String error;
+            MeasureHolder mHolder;
+            if(!mHolder.fromRecord(error, dataCol.keywordSet().asRecord("LOFAR_APPLIED_BEAM_DIR")))
+              throw std::runtime_error(error);
+            info().setBeamCorrectionDir(mHolder.asMDirection());
+          }
+        }
       } else {
         if (itsMissingData) {
           // Only give warning if a missing data column is allowed.
@@ -568,7 +593,7 @@ namespace DP3 {
       ROArrayMeasColumn<MDirection> fldcol2 (fldtab, "DELAY_DIR");
       phaseCenter = *(fldcol1(0).data());
       delayCenter = *(fldcol2(0).data());
-
+      
 #ifdef HAVE_LOFAR_BEAM
       tileBeamDir = LOFAR::StationResponse::readTileBeamDirection(itsMS);
 #endif

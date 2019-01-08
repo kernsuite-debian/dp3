@@ -54,6 +54,8 @@ namespace DP3 {
       // Define the shared pointer for this type.
       typedef std::shared_ptr<OneApplyCal> ShPtr;
 
+      enum class InterpolationType {NEAREST, LINEAR};
+
       enum CorrectType {GAIN, FULLJONES, TEC, CLOCK, ROTATIONANGLE, SCALARPHASE, PHASE,
                         ROTATIONMEASURE, SCALARAMPLITUDE, AMPLITUDE};
 
@@ -124,6 +126,7 @@ namespace DP3 {
       H5Parm::SolTab   itsSolTab2; // in the case of full Jones, amp and phase table need to be open
       CorrectType      itsCorrectType;
       bool             itsInvert;
+      InterpolationType itsInterpolationType;
       uint             itsTimeSlotsPerParmUpdate;
       double           itsSigmaMMSE;
       bool             itsUpdateWeights;
@@ -131,7 +134,7 @@ namespace DP3 {
       uint             itsCount; // number of steps
 
       // Expressions to search for in itsParmDB
-      vector<casacore::String>   itsParmExprs;
+      std::vector<casacore::String>   itsParmExprs;
 
       // parameters, numparms, antennas, time x frequency
       casacore::Cube<casacore::DComplex> itsParms;
