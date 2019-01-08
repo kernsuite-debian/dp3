@@ -53,7 +53,9 @@ namespace DP3 {
         itsTimeAvg      (1),
         itsStartTime    (0),
         itsTimeInterval (0),
-        itsPhaseCenterIsOriginal (true)
+        itsPhaseCenterIsOriginal (true),
+        itsBeamCorrectionMode(NoBeamCorrection),
+        itsNThreads     (0)
     {}
 
     void DPInfo::init (uint ncorr, uint startChan, uint nchan,

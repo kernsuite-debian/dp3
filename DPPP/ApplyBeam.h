@@ -39,6 +39,7 @@
 #endif
 
 #include <casacore/casa/Arrays/Cube.h>
+#include <casacore/measures/Measures/MDirection.h>
 
 namespace DP3 {
 
@@ -54,9 +55,6 @@ namespace DP3 {
     class ApplyBeam: public DPStep
     {
       public:
-        // Modes for the beam: only array factor, only element beam, or both (default)
-        enum BeamMode {DEFAULT=1, ARRAY_FACTOR=2, ELEMENT=3};
-
         // Construct the object.
         // Parameters are obtained from the parset using the given prefix.
         ApplyBeam (DPInput*, const ParameterSet&, const string& prefix, bool substep=false);
@@ -99,8 +97,8 @@ namespace DP3 {
             const LOFAR::StationResponse::vector3r_t& srcdir,
             const LOFAR::StationResponse::vector3r_t& refdir,
             const LOFAR::StationResponse::vector3r_t& tiledir,
-            const vector<LOFAR::StationResponse::Station::Ptr>& antBeamInfo,
-            vector<LOFAR::StationResponse::matrix22c_t>& beamValues,
+            const std::vector<LOFAR::StationResponse::Station::Ptr>& antBeamInfo,
+            std::vector<LOFAR::StationResponse::matrix22c_t>& beamValues,
             bool useChannelFreq, bool invert, int mode,
             bool doUpdateWeights=false);
 
@@ -115,17 +113,19 @@ namespace DP3 {
         DPBuffer             itsBuffer;
         bool                 itsInvert;
         bool                 itsUpdateWeights;
+        std::vector<string>       itsDirectionStr;
+        casacore::MDirection itsDirection;
         bool                 itsUseChannelFreq;
-        Position             itsPhaseRef;
-        BeamMode             itsMode;
+        //Position             itsPhaseRef;
+        BeamCorrectionMode   itsMode;
 
         uint                 itsDebugLevel;
 
         // The info needed to calculate the station beams.
-        vector<vector<LOFAR::StationResponse::Station::Ptr> > itsAntBeamInfo;
-        vector<casacore::MeasFrame> itsMeasFrames;
-        vector<casacore::MDirection::Convert> itsMeasConverters;
-        vector<vector<LOFAR::StationResponse::matrix22c_t> > itsBeamValues;
+        std::vector<std::vector<LOFAR::StationResponse::Station::Ptr> > itsAntBeamInfo;
+        std::vector<casacore::MeasFrame> itsMeasFrames;
+        std::vector<casacore::MDirection::Convert> itsMeasConverters;
+        std::vector<std::vector<LOFAR::StationResponse::matrix22c_t> > itsBeamValues;
 
         NSTimer itsTimer;
     };
@@ -133,7 +133,5 @@ namespace DP3 {
   } //# end namespace
 }
 #endif
-
-#include "ApplyBeam.tcc"
 
 #endif // HAVE_LOFAR_BEAM

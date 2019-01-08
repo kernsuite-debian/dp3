@@ -71,7 +71,7 @@ namespace DP3 {
 
       // Constructor to initialize.
       DPStep()
-        : itsPrevStep(0), itsNThreads(0)
+        : itsPrevStep(0)
       {}
 
       // Destructor.
@@ -127,12 +127,6 @@ namespace DP3 {
       const DPStep::ShPtr& getNextStep() const
         { return itsNextStep; }
         
-      void setNThreads(size_t nThreads)
-      { itsNThreads = nThreads; }
-      
-      size_t NThreads() const
-      { return itsNThreads; }
-
     protected:
       DPInfo& info()
         { return itsInfo; }
@@ -147,7 +141,6 @@ namespace DP3 {
       DPStep* itsPrevStep; // Normal pointer for back links, prevent
                            // two shared pointers to same object
       DPInfo itsInfo;
-      size_t itsNThreads;
     };
 
 
@@ -247,9 +240,9 @@ namespace DP3 {
       virtual void show (std::ostream&) const;
 
       // Get the result.
-      const vector<DPBuffer>& get() const
+      const std::vector<DPBuffer>& get() const
         { return itsBuffers; }
-      vector<DPBuffer>& get()
+      std::vector<DPBuffer>& get()
         { return itsBuffers; }
 
       // Get the size of the result.
@@ -261,7 +254,7 @@ namespace DP3 {
         { itsSize = 0; }
 
     private:
-      vector<DPBuffer> itsBuffers;
+      std::vector<DPBuffer> itsBuffers;
       size_t           itsSize;
     };
 
