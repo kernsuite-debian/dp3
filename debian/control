@@ -20,7 +20,7 @@ Build-Depends:
  libcfitsio-dev,
  libarmadillo-dev,
  aoflagger-dev,
- lofar-dev,
+ lofarbeam-dev,
  python-all,
  dh-python,
  libboost-signals-dev,
