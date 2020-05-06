@@ -1,3 +1,11 @@
+dp3 (4.1-1) bionic; urgency=medium
+
+  [ Gijs Molenaar ]
+  * update watch file
+  * New upstream version 4.1
+
+ -- KERN packaging <packaging@kernsuite.info>  Wed, 06 May 2020 16:01:24 +0200
+
 dp3 (3.1.7+git20181205.395619b-1kern1) bionic; urgency=medium
 
   [ Gijs Molenaar ]
