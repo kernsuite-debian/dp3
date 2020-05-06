@@ -75,7 +75,6 @@ namespace DP3 {
         itsInvert=parset.getBool(prefix + "invert", true);
       }
       string mode=boost::to_lower_copy(parset.getString(prefix + "beammode","default"));
-      assert (mode=="default" || mode=="array_factor" || mode=="element");
       if (mode=="default") {
         itsMode=FullBeamCorrection;
       } else if (mode=="array_factor") {
@@ -120,10 +119,19 @@ namespace DP3 {
         itsDirection = MDirection(q0, q1, type);
       }
       
-      if(info().beamCorrectionMode() != NoBeamCorrection)
-        throw std::runtime_error("In applying the beam: the metadata of this observation indicate that the beam has already been applied");
-      info().setBeamCorrectionMode(itsMode);
-      info().setBeamCorrectionDir(itsDirection);
+      if(itsInvert)
+      {
+        if(info().beamCorrectionMode() != NoBeamCorrection)
+          throw std::runtime_error("In applying the beam (with invert=true): the metadata of this observation indicate that the beam has already been applied");
+        info().setBeamCorrectionMode(itsMode);
+        info().setBeamCorrectionDir(itsDirection);
+      }
+      else {
+        if(info().beamCorrectionMode() == NoBeamCorrection)
+          throw std::runtime_error("In applying the beam (with invert=false): the metadata of this observation indicate that the beam has not yet been applied");
+        info().setBeamCorrectionMode(NoBeamCorrection);
+        // TODO itsDirection should always be equal to info().beamCorrectionDir() here?
+      }
 
       const size_t nSt = info().nantenna();
       const size_t nCh = info().nchan();
@@ -248,9 +256,9 @@ void ApplyBeam::applyBeam(
 {
   using dcomplex = std::complex<double>;
   // Get the beam values for each station.
-  uint nCh = info.chanFreqs().size();
-  uint nSt = beamValues.size() / nCh;
-  uint nBl = info.nbaselines();
+  unsigned int nCh = info.chanFreqs().size();
+  unsigned int nSt = beamValues.size() / nCh;
+  unsigned int nBl = info.nbaselines();
 
   // Store array factor in diagonal matrix (in other modes this variable
   // is not used).

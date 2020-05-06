@@ -193,7 +193,8 @@ namespace DP3 {
                                  const casacore::Vector<casacore::String>& antNames);
 #endif
       
-      // Tell if the visibility data are to be read.
+      // Tell if the visibility data are to be read. If set to true once,
+      // this will stay true.
       virtual void setReadVisData (bool readVisData);
 
       // Get the main MS table.
@@ -216,7 +217,7 @@ namespace DP3 {
 
       // Get the rownrs for meta info of missing time slots.
       // It uses the rows of the first time slot.
-      const casacore::Vector<uint>& getBaseRowNrs() const
+      const casacore::Vector<unsigned int>& getBaseRowNrs() const
         { return itsBaseRowNrs; }
 
       // Get the name of the MS.
@@ -229,7 +230,7 @@ namespace DP3 {
         { return itsLastTime; }
 
       // Get the selected spectral window.
-      uint spectralWindow() const
+      unsigned int spectralWindow() const
         { return itsSpw; }
 
       // Get the baseline selection.
@@ -241,14 +242,14 @@ namespace DP3 {
         { return itsMissingData; }
 
       // Get the start channel.
-      uint startChan() const
+      unsigned int startChan() const
         { return itsStartChan; }
 
       // Get the nr of averaged full resolution channels.
-      uint nchanAvgFullRes() const
+      unsigned int nchanAvgFullRes() const
         { return itsFullResNChanAvg; }
       // Get the nr of averaged full resolution time slots.
-      uint ntimeAvgFullRes() const
+      unsigned int ntimeAvgFullRes() const
         { return itsFullResNTimeAvg; }
 
       // Tell if the input MS has LOFAR_FULL_RES_FLAG.
@@ -303,10 +304,10 @@ namespace DP3 {
       bool                itsUseAllChan;    //# all channels (i.e. no slicer)?
       bool                itsMissingData;   //# allow missing data column?
       int                 itsSpw;           //# spw (band) to use (<0 no select)
-      uint                itsNrBl;
-      uint                itsNrCorr;
-      uint                itsNrChan;
-      uint                itsStartChan;
+      unsigned int                itsNrBl;
+      unsigned int                itsNrCorr;
+      unsigned int                itsNrChan;
+      unsigned int                itsStartChan;
       double              itsTimeTolerance; //# tolerance for time comparison
       double              itsTimeInterval;
       double              itsStartTime;
@@ -314,16 +315,16 @@ namespace DP3 {
       double              itsLastTime;
       double              itsNextTime;
       double              itsLastMSTime;
-      uint                itsNrRead;        //# nr of time slots read from MS
-      uint                itsNrInserted;    //# nr of inserted time slots
+      unsigned int                itsNrRead;        //# nr of time slots read from MS
+      unsigned int                itsNrInserted;    //# nr of inserted time slots
       casacore::Slicer        itsColSlicer;     //# slice in corr,chan column
       casacore::Slicer        itsArrSlicer;     //# slice in corr,chan,bl array
       bool                itsHasFullResFlags;
-      uint                itsFullResNChanAvg;
-      uint                itsFullResNTimeAvg;
+      unsigned int                itsFullResNChanAvg;
+      unsigned int                itsFullResNTimeAvg;
       DPBuffer            itsBuffer;
       UVWCalculator       itsUVWCalc;
-      casacore::Vector<uint>  itsBaseRowNrs;    //# rownrs for meta of missing times
+      casacore::Vector<unsigned int>  itsBaseRowNrs;    //# rownrs for meta of missing times
       FlagCounter         itsFlagCounter;
       NSTimer             itsTimer;
     };

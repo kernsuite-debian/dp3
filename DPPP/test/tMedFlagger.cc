@@ -28,14 +28,14 @@
 #include <DPPP/DPInfo.h>
 #include <Common/ParameterSet.h>
 #include <Common/StringUtil.h>
-#include <casa/Arrays/ArrayMath.h>
-#include <casa/Arrays/ArrayLogical.h>
-#include <casa/Arrays/ArrayIO.h>
+#include <casacore/casa/Arrays/ArrayMath.h>
+#include <casacore/casa/Arrays/ArrayLogical.h>
+#include <casacore/casa/Arrays/ArrayIO.h>
 #include <iostream>
 
 using namespace LOFAR;
 using namespace DP3::DPPP;
-using namespace casa;
+using namespace casacore;
 using namespace std;
 
 // Simple class to generate input arrays.
@@ -276,7 +276,7 @@ int main()
   INIT_LOGGER ("tMedFlagger");
   try {
 
-    for (uint i=0; i<2; ++i) {
+    for (unsigned int i=0; i<2; ++i) {
       test1(10, 2, 32, 4, false, 1, i>0);
       test1(10, 5, 32, 4, true, 1, i>0);
       test2( 4, 2,  8, 4, false, 100, i>0);

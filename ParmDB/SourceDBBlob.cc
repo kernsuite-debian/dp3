@@ -57,14 +57,15 @@ namespace BBS {
           itsFile.open (pdm.getTableName().c_str(), ios::in | ios::binary);
           itsCanWrite = false;
         }
-        assert (itsFile);
+        if (!itsFile)
+          throw std::runtime_error("Error opening file " + pdm.getTableName());
       }
     }
     if (forceNew) {
       itsFile.open (pdm.getTableName().c_str(),
                     ios::out | ios::in | ios::trunc | ios::binary);
       if (!itsFile)
-				throw std::runtime_error("SourceDB blob file " + pdm.getTableName() +
+        throw std::runtime_error("SourceDB blob file " + pdm.getTableName() +
                  " cannot be created");
     }
     itsBufIn   = std::shared_ptr<BlobIBufStream>(new BlobIBufStream(itsFile));
@@ -111,22 +112,22 @@ namespace BBS {
     return false;
   }
 
-  uint SourceDBBlob::addPatch (const string& patchName, int catType,
+  unsigned int SourceDBBlob::addPatch (const string& patchName, int catType,
                                double apparentBrightness,
                                double ra, double dec,
                                bool)
   {
     // Write at the end of the file.
     if (!itsCanWrite)
-			throw std::runtime_error("SourceDBBlob: file is not writable");
+      throw std::runtime_error("SourceDBBlob: file is not writable");
     itsFile.seekp (0, ios::end);
-    uint filePos = itsFile.tellp();
+    unsigned int filePos = itsFile.tellp();
     *itsBlobOut << PatchInfo(patchName, ra, dec, catType, apparentBrightness);
     itsEndPos = itsFile.tellp();
     return filePos;
   }
 
-  void SourceDBBlob::updatePatch (uint filePos,
+  void SourceDBBlob::updatePatch (unsigned int filePos,
                                   double apparentBrightness,
                                   double ra, double dec)
   {
@@ -217,7 +218,7 @@ namespace BBS {
       Vector<uInt> index(names.size());
       sort.sort (index, names.size());
       nmout.reserve (names.size());
-      for (uint i=0; i<names.size(); ++i) {
+      for (unsigned int i=0; i<names.size(); ++i) {
         nmout.push_back (names[index[i]]);
       }
     }

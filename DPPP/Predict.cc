@@ -101,7 +101,8 @@ namespace DP3 {
       itsDebugLevel = parset.getInt (prefix + "debuglevel", 0);
       itsPatchList = vector<Patch::ConstPtr> ();
 
-      assert(File(itsSourceDBName).exists());
+      if(!File(itsSourceDBName).exists())
+        throw std::runtime_error("Specified source DB name does not exist");
       BBS::SourceDB sourceDB(BBS::ParmDBMeta("", itsSourceDBName), false);
 
       // Save directions specifications to pass to applycal
@@ -118,7 +119,6 @@ namespace DP3 {
         itsOneBeamPerPatch=parset.getBool (prefix + "onebeamperpatch", false);
 
         string mode=boost::to_lower_copy(parset.getString(prefix + "beammode","default"));
-        assert (mode=="default" || mode=="array_factor" || mode=="element");
         if (mode=="default") {
           itsBeamMode=FullBeamCorrection;
         } else if (mode=="array_factor") {
@@ -166,8 +166,8 @@ namespace DP3 {
       itsDoApplyCal=true;
       itsApplyCalStep=ApplyCal(input, parset, prefix, true,
                                itsDirectionsStr);
-      assert(!(itsOperation!="replace" &&
-               parset.getBool(prefix + "applycal.updateweights", false)));
+      if(itsOperation!="replace" && parset.getBool(prefix + "applycal.updateweights", false))
+        throw std::invalid_argument("Weights cannot be updated when operation is not replace");
       itsResultStep=new ResultStep();
       itsApplyCalStep.setNextStep(DPStep::ShPtr(itsResultStep));
     }
@@ -198,21 +198,28 @@ namespace DP3 {
       itsMeasFrames.resize(nThreads);
 #endif
 
-      for (uint thread=0; thread<nThreads; ++thread) {
+      for (unsigned int thread=0; thread<nThreads; ++thread) {
         if (itsStokesIOnly) {
           itsModelVis[thread].resize(1,nCh,nBl);
         } else {
           itsModelVis[thread].resize(nCr,nCh,nBl);
         }
+        bool needMeasConverters = itsMovingPhaseRef;
 #ifdef HAVE_LOFAR_BEAM
-        if (itsApplyBeam) {
-          itsModelVisPatch[thread].resize(nCr,nCh,nBl);
-          itsBeamValues[thread].resize(nSt*nCh);
+        needMeasConverters = needMeasConverters || itsApplyBeam;
+#endif
+        if (needMeasConverters) {
+          // Prepare measures converters
           itsMeasFrames[thread].set (info().arrayPosCopy());
           itsMeasFrames[thread].set (MEpoch(MVEpoch(info().startTime()/86400),
                                             MEpoch::UTC));
           itsMeasConverters[thread].set (MDirection::J2000,
                                          MDirection::Ref(MDirection::ITRF, itsMeasFrames[thread]));
+        }
+#ifdef HAVE_LOFAR_BEAM
+        if (itsApplyBeam) {
+          itsModelVisPatch[thread].resize(nCr,nCh,nBl);
+          itsBeamValues[thread].resize(nSt*nCh);
           itsInput->fillBeamInfo (itsAntBeamInfo[thread], info().antennaNames());
         }
 #endif
@@ -224,18 +231,25 @@ namespace DP3 {
       info() = infoIn;
       info().setNeedVisData();
       info().setWriteData();
-
+      info().setBeamCorrectionMode(NoBeamCorrection);
+      
       const size_t nBl=info().nbaselines();
       for (size_t i=0; i!=nBl; ++i) {
         itsBaselines.push_back (Baseline(info().getAnt1()[i],
                                          info().getAnt2()[i]));
       }
 
-      MDirection dirJ2000(MDirection::Convert(infoIn.phaseCenter(),
-                                              MDirection::J2000)());
-      Quantum<Vector<Double> > angles = dirJ2000.getAngle();
-      itsPhaseRef = Position(angles.getBaseValue()[0],
-                             angles.getBaseValue()[1]);
+      try {
+        MDirection dirJ2000(MDirection::Convert(infoIn.phaseCenter(),
+                                                MDirection::J2000)());
+        Quantum<Vector<Double> > angles = dirJ2000.getAngle();
+        itsMovingPhaseRef = false;
+        itsPhaseRef = Position(angles.getBaseValue()[0],
+                               angles.getBaseValue()[1]);
+      } catch (AipsError&) {
+        // Phase direction (in J2000) is time dependent
+        itsMovingPhaseRef = true;
+      }
 
       initializeThreadData();
 
@@ -253,8 +267,8 @@ namespace DP3 {
 
     void Predict::setOperation(const std::string& operation) {
       itsOperation=operation;
-      assert(itsOperation=="replace" || itsOperation=="add" ||
-             itsOperation=="subtract");
+      if(itsOperation!="replace" && itsOperation!="add" && itsOperation!="subtract")
+        throw std::invalid_argument("Operation must be 'replace', 'add' or 'subtract'.");
     }
 
     void Predict::show (std::ostream& os) const
@@ -311,28 +325,42 @@ namespace DP3 {
 
       nsplitUVW(itsUVWSplitIndex, itsBaselines, itsTempBuffer.getUVW(), itsUVW);
 
-#ifdef HAVE_LOFAR_BEAM
       double time = itsTempBuffer.getTime();
+#ifdef HAVE_LOFAR_BEAM
       //Set up directions for beam evaluation
       LOFAR::StationResponse::vector3r_t refdir, tiledir;
+#endif
 
-      if (itsApplyBeam)
+      bool needMeasConverters = itsMovingPhaseRef;
+#ifdef HAVE_LOFAR_BEAM
+      needMeasConverters = needMeasConverters || itsApplyBeam;
+#endif
+      if (needMeasConverters)
       {
         // Because multiple predict steps might be predicting simultaneously, and
         // Casacore is not thread safe, this needs synchronization.
         std::unique_lock<std::mutex> lock;
         if(itsMeasuresMutex != nullptr)
           lock = std::unique_lock<std::mutex>(*itsMeasuresMutex);
-        for (uint thread=0; thread!=getInfo().nThreads(); ++thread) {
+        for (unsigned int thread=0; thread!=getInfo().nThreads(); ++thread) {
           itsMeasFrames[thread].resetEpoch (MEpoch(MVEpoch(time/86400),
                                                    MEpoch::UTC));
-          //Do a conversion on all threads, because converters are not
-          //thread safe and apparently need to be used at least once
+          //Do a conversion on all threads
+#ifdef HAVE_LOFAR_BEAM
           refdir  = dir2Itrf(info().delayCenter(), itsMeasConverters[thread]);
           tiledir = dir2Itrf(info().tileBeamDir(), itsMeasConverters[thread]);
+#endif
         }
       }
-#endif
+
+      if (itsMovingPhaseRef) {
+      // Convert phase reference to J2000
+       MDirection dirJ2000(MDirection::Convert(info().phaseCenter(),
+           MDirection::Ref(MDirection::J2000, itsMeasFrames[0]))());
+         Quantum<Vector<Double> > angles = dirJ2000.getAngle();
+          itsPhaseRef = Position(angles.getBaseValue()[0],
+                                 angles.getBaseValue()[1]);
+      }
 
       std::unique_ptr<ThreadPool> localThreadPool;
       ThreadPool* pool = itsThreadPool;
@@ -381,21 +409,20 @@ namespace DP3 {
       });
 #ifdef HAVE_LOFAR_BEAM
       // Apply beam to the last patch
-      for(size_t thread=0; thread!=pool->NThreads(); ++thread)
-      {
+      pool->For(0, pool->NThreads(), [&](size_t thread, size_t) {
         if (itsApplyBeam && curPatches[thread]!=nullptr) {
           addBeamToData (curPatches[thread], time, refdir, tiledir, thread, nSamples,
             itsModelVisPatch[thread].data());
         }
-      }
+      });
 #endif
 
       // Add all thread model data to one buffer
       itsTempBuffer.getData()=Complex();
       Complex* tdata=itsTempBuffer.getData().data();
-      for (uint thread=0; thread<pool->NThreads(); ++thread) {
+      for (unsigned int thread=0; thread<pool->NThreads(); ++thread) {
         if (itsStokesIOnly) {
-          for (uint i=0,j=0;i<nSamples;i+=nCr,j++) {
+          for (unsigned int i=0,j=0;i<nSamples;i+=nCr,j++) {
             tdata[i] += itsModelVis[thread].data()[j];
             tdata[i+nCr-1] += itsModelVis[thread].data()[j];
           }
@@ -452,7 +479,7 @@ namespace DP3 {
     void Predict::addBeamToData (Patch::ConstPtr patch, double time,
                                  const LOFAR::StationResponse::vector3r_t& refdir,
                                  const LOFAR::StationResponse::vector3r_t& tiledir,
-                                 uint thread, uint nSamples, dcomplex* data0) {
+                                 unsigned int thread, unsigned int nSamples, dcomplex* data0) {
       //Apply beam for a patch, add result to itsModelVis
       MDirection dir (MVDirection(patch->position()[0],
                                   patch->position()[1]),

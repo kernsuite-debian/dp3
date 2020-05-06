@@ -52,7 +52,6 @@
 #include <casacore/casa/Quanta/MVTime.h>
 #include <casacore/casa/OS/Conversion.h>
 
-#include <cassert>
 #include <iostream>
 
 using namespace casacore;
@@ -84,7 +83,7 @@ namespace DP3 {
       itsNrChanStr        = parset.getString (prefix+"nchan", "0");
       string startTimeStr = parset.getString (prefix+"starttime", "");
       string endTimeStr   = parset.getString (prefix+"endtime", "");
-      uint nTimes         = parset.getInt    (prefix+"ntimes", 0);
+      unsigned int nTimes = parset.getInt    (prefix+"ntimes", 0);
       itsTimeTolerance    = parset.getDouble (prefix+"timetolerance", 1e-2);
       itsUseFlags         = parset.getBool   (prefix+"useflag", true);
       itsDataColName      = parset.getString (prefix+"datacolumn", "DATA");
@@ -148,19 +147,21 @@ namespace DP3 {
       itsFirstTime = startTime;
       if (!startTimeStr.empty()) {
         if (!MVTime::read (qtime, startTimeStr)) {
-          throw Exception(startTimeStr + " is an invalid date/time");
+          throw std::runtime_error(startTimeStr + " is an invalid date/time");
         }
         itsFirstTime = qtime.getValue("s");
-        assert (itsFirstTime <= endTime);
+        if (itsFirstTime > endTime)
+          throw std::runtime_error("starttime is past end of time axis");
       }
       itsLastTime = endTime;
       if (!endTimeStr.empty()) {
         if (!MVTime::read (qtime, endTimeStr)) {
-          throw Exception(endTimeStr + " is an invalid date/time");
+          throw std::runtime_error(endTimeStr + " is an invalid date/time");
         }
         itsLastTime = qtime.getValue("s");
       }
-      assert (itsLastTime >= itsFirstTime);
+      if (itsLastTime < itsFirstTime)
+        throw std::runtime_error("endtime is before start of time axis");
       // If needed, skip the first times in the MS.
       // It also sets itsFirstTime properly (round to time/interval in MS).
       skipFirstTimes();
@@ -178,15 +179,15 @@ namespace DP3 {
       // nchan=0 means until the last channel.
       double result;
       node1.get (rec, result);
-      itsStartChan = uint(result+0.001);
+      itsStartChan = (unsigned int)(result+0.001);
       node2.get (rec, result);
-      uint nrChan = uint(result+0.0001);
-      uint nAllChan = itsNrChan;
+      unsigned int nrChan = (unsigned int)(result+0.0001);
+      unsigned int nAllChan = itsNrChan;
       if (itsStartChan >= nAllChan)
         throw Exception(
                  "startchan " + std::to_string(itsStartChan)
                  + " exceeds nr of channels in MS (" + std::to_string(nAllChan) + ')');
-      uint maxNrChan = nAllChan - itsStartChan;
+      unsigned int maxNrChan = nAllChan - itsStartChan;
       if (nrChan == 0) {
         itsNrChan = maxNrChan;
       } else {
@@ -223,7 +224,7 @@ namespace DP3 {
 
     void MSReader::setReadVisData (bool readVisData)
     {
-      itsReadVisData = readVisData;
+      itsReadVisData = (itsReadVisData || readVisData);
     }
 
     bool MSReader::process (const DPBuffer&)
@@ -282,7 +283,7 @@ namespace DP3 {
         ///cout << "read time " <<itsBuffer.getTime() - 4472025855.0<<endl;
         if (!useIter) {
           // Need to insert a fully flagged time slot.
-          itsBuffer.setRowNrs (Vector<uint>());
+          itsBuffer.setRowNrs (Vector<unsigned int>());
           itsBuffer.setExposure (itsTimeInterval);
           itsBuffer.getFlags() = true;
           if (itsReadVisData){
@@ -326,7 +327,7 @@ namespace DP3 {
               }
               // Set flags if FLAG_ROW is set.
               ROScalarColumn<bool> flagrowCol(itsIter.table(), "FLAG_ROW");
-              for (uint i=0; i<itsIter.table().nrow(); ++i) {
+              for (unsigned int i=0; i<itsIter.table().nrow(); ++i) {
                 if (flagrowCol(i)) {
                   itsBuffer.getFlags()
                     (IPosition(3,0,0,i),
@@ -364,8 +365,8 @@ namespace DP3 {
       int ncorr=dataCube.shape()[0];
       const Complex* dataPtr = dataCube.data();
       bool* flagPtr = flagsCube.data();
-      for (uint i=0; i<dataCube.size();) {
-        for (uint j=i; j<i+ncorr; ++j) {
+      for (unsigned int i=0; i<dataCube.size();) {
+        for (unsigned int j=i; j<i+ncorr; ++j) {
           bool flag = (!isFinite(dataPtr[j].real())  ||
                        !isFinite(dataPtr[j].imag()));
           if (flag) {
@@ -373,7 +374,7 @@ namespace DP3 {
           }
           if (flag  ||  flagPtr[j]) {
             // Flag all correlations if a single one is flagged.
-            for (uint k=i; k<i+ncorr; ++k) {
+            for (unsigned int k=i; k<i+ncorr; ++k) {
               flagPtr[k] = true;
             }
             break;
@@ -404,7 +405,7 @@ namespace DP3 {
         os << "  nchan:          " << getInfo().nchan() << "  (" << itsNrChanStr
            << ')' << std::endl;
         os << "  ncorrelations:  " << getInfo().ncorr() << std::endl;
-        uint nrbl = getInfo().nbaselines();
+        unsigned int nrbl = getInfo().nbaselines();
         os << "  nbaselines:     " << nrbl << std::endl;
         os << "  ntimes:         " << (nrbl==0 ? 0 : itsSelMS.nrow() / nrbl) << std::endl;
         os << "  time interval:  " << getInfo().timeInterval() << std::endl;
@@ -566,11 +567,11 @@ namespace DP3 {
       Table anttab(itsMS.keywordSet().asTable("ANTENNA"));
       ROScalarColumn<String> nameCol (anttab, "NAME");
       ROScalarColumn<Double> diamCol (anttab, "DISH_DIAMETER");
-      uint nant = anttab.nrow();
+      unsigned int nant = anttab.nrow();
       ROScalarMeasColumn<MPosition> antcol (anttab, "POSITION");
       vector<MPosition> antPos;
       antPos.reserve (nant);
-      for (uint i=0; i<nant; ++i) {
+      for (unsigned int i=0; i<nant; ++i) {
         antPos.push_back (antcol(i));
       }
       // Set antenna/baseline info.
@@ -587,7 +588,8 @@ namespace DP3 {
       // The same for DELAY_DIR and LOFAR_TILE_BEAM_DIR.
       // If LOFAR_TILE_BEAM_DIR does not exist, use DELAY_DIR.
       Table fldtab (itsMS.keywordSet().asTable ("FIELD"));
-      AlwaysAssert (fldtab.nrow() == 1, AipsError);
+      if (fldtab.nrow() != 1)
+        throw std::runtime_error("Multiple entries in FIELD table");
       MDirection phaseCenter, delayCenter, tileBeamDir;
       ROArrayMeasColumn<MDirection> fldcol1 (fldtab, "PHASE_DIR");
       ROArrayMeasColumn<MDirection> fldcol2 (fldtab, "DELAY_DIR");
@@ -616,7 +618,7 @@ namespace DP3 {
     void MSReader::prepare2()
     {
       // Set the info.
-      uint ntime = uint((itsLastTime - itsFirstTime)/itsTimeInterval + 1.5);
+      unsigned int ntime = (unsigned int)((itsLastTime - itsFirstTime)/itsTimeInterval + 1.5);
       // Read the antenna set.
       Table obstab(itsMS.keywordSet().asTable("OBSERVATION"));
       string antennaSet;
@@ -698,7 +700,7 @@ namespace DP3 {
       uvws.resize (3, itsNrBl);
       const Vector<Int>& ant1 = getInfo().getAnt1();
       const Vector<Int>& ant2 = getInfo().getAnt2();
-      for (uint i=0; i<itsNrBl; ++i) {
+      for (unsigned int i=0; i<itsNrBl; ++i) {
         uvws.column(i) = itsUVWCalc.getUVW (ant1[i], ant2[i], time);
       }
     }
@@ -744,15 +746,15 @@ namespace DP3 {
           Matrix<float> inArr = wCol.getColumnCells (rowNrs);
           float* inPtr  = inArr.data();
           float* outPtr = weights.data();
-          for (uint i=0; i<itsNrBl; ++i) {
+          for (unsigned int i=0; i<itsNrBl; ++i) {
             // Set global weights to 1 if zero. Some old MSs need that.
-            for (uint k=0; k<itsNrCorr; ++k) {
+            for (unsigned int k=0; k<itsNrCorr; ++k) {
               if (inPtr[k] == 0.) {
                 inPtr[k] = 1.;
               }
             }
-            for (uint j=0; j<itsNrChan; ++j) {
-              for (uint k=0; k<itsNrCorr; ++k) {
+            for (unsigned int j=0; j<itsNrChan; ++j) {
+              for (unsigned int k=0; k<itsNrCorr; ++k) {
                 *outPtr++ = inPtr[k];
               }
             }
@@ -769,9 +771,9 @@ namespace DP3 {
     void MSReader::autoWeight (Cube<float>& weights, const DPBuffer& buf)
     {
       const double* chanWidths = getInfo().chanWidths().data();
-      uint npol  = weights.shape()[0];
-      uint nchan = weights.shape()[1];
-      uint nbl   = weights.shape()[2];
+      unsigned int npol  = weights.shape()[0];
+      unsigned int nchan = weights.shape()[1];
+      unsigned int nbl   = weights.shape()[2];
       // Get the autocorrelations indices.
       const vector<int>& autoInx = getInfo().getAutoCorrIndex();
       // Calculate the weight for each cross-correlation data point.
@@ -779,14 +781,14 @@ namespace DP3 {
       const Vector<Int>& ant2 = getInfo().getAnt2();
       const Complex* data = buf.getData().data();
       float* weight = weights.data();
-      for (uint i=0; i<nbl; ++i) {
+      for (unsigned int i=0; i<nbl; ++i) {
         // Can only be done if both autocorrelations are present.
         if (ant1[i] != ant2[i]  &&
             autoInx[ant1[i]] >= 0  &&  autoInx[ant2[i]] >= 0) {
           // Get offset of both autocorrelations in data array.
           const Complex* auto1 = data + autoInx[ant1[i]]*nchan*npol;
           const Complex* auto2 = data + autoInx[ant2[i]]*nchan*npol;
-          for (uint j=0; j<nchan; ++j) {
+          for (unsigned int j=0; j<nchan; ++j) {
             if (auto1[0].real() != 0  &&  auto2[0].real() != 0) {
               double w = chanWidths[j] * itsTimeInterval;
               weight[0] *= w / (auto1[0].real() * auto2[0].real());      // XX
@@ -842,14 +844,16 @@ namespace DP3 {
       // ntimeavg is the nr of times used when averaging.
       // Return it as Cube<bool>[norigchan,ntimeavg,nrbl].
       IPosition chShape = chars.shape();
-      assert (chShape[1] == itsFullResNTimeAvg  &&  chShape[2] == itsNrBl);
+      if (chShape[1] != itsFullResNTimeAvg  ||  chShape[2] != itsNrBl)
+        throw std::runtime_error("Incorrect shape of LOFAR_FULL_RES_FLAG column");
       // Now expand the bits to bools.
       // If all bits to convert are contiguous, do it all in one go.
       // Otherwise we have to iterate.
       if (norigchan == chShape[0]*8) {
         Conversion::bitToBool (flags.data(), chars.data(), flags.size());
       } else {
-        assert (norigchan < chShape[0]*8);
+        if (norigchan > chShape[0]*8)
+          throw std::runtime_error("Shape of LOFAR_FULL_RES_FLAG column is inconsistent");
         const uChar* charsPtr = chars.data();
         bool* flagsPtr = flags.data();
         for (int i=0; i<chShape[1]*chShape[2]; ++i) {
@@ -890,8 +894,8 @@ namespace DP3 {
       // Copy only the ones for which the station name matches.
       // Note: the order of the station names in both vectors match.
       vec.resize (antNames.size());
-      uint ant = 0;
-      for (uint i=0; i<allNames.size(); ++i) {
+      unsigned int ant = 0;
+      for (unsigned int i=0; i<allNames.size(); ++i) {
         if (ant < antNames.size()  &&  allNames[i] == antNames[ant]) {
           vec[ant] = beams[i];
           ant++;

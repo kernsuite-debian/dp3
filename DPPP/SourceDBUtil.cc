@@ -43,7 +43,7 @@ using BBS::SourceInfo;
 
 std::vector<Patch::ConstPtr> makePatches(SourceDB &sourceDB,
                                     const std::vector<string> &patchNames,
-                                    uint nModel)
+                                    unsigned int nModel)
 {
   // Create a component list for each patch name.
   std::vector<std::vector<ModelComponent::Ptr> > componentsList(nModel);
@@ -55,10 +55,11 @@ std::vector<Patch::ConstPtr> makePatches(SourceDB &sourceDB,
   while (! sourceDB.atEnd()) {
     sourceDB.getNextSource (src);
     // Use the source if its patch matches a patch name.
-    for (uint i=0; i<nModel; ++i) {
+    for (unsigned int i=0; i<nModel; ++i) {
       if (src.getPatchName() == patchNames[i]) {
         // Fetch position.
-        assert (src.getInfo().getRefType() == "J2000");
+        if (src.getInfo().getRefType() != "J2000")
+          throw std::runtime_error("Reference type should be J2000");
         Position position;
         position[0] = src.getRa();
         position[1] = src.getDec();
@@ -128,7 +129,7 @@ std::vector<Patch::ConstPtr> makePatches(SourceDB &sourceDB,
 
   std::vector<Patch::ConstPtr> patchList;
   patchList.reserve (componentsList.size());
-  for (uint i=0; i<componentsList.size(); ++i) {
+  for (unsigned int i=0; i<componentsList.size(); ++i) {
     if (componentsList[i].empty())
       throw Exception("No sources found for patch "
                + patchNames[i]);
@@ -136,7 +137,8 @@ std::vector<Patch::ConstPtr> makePatches(SourceDB &sourceDB,
                                 componentsList[i].begin(),
                                 componentsList[i].end()));
     std::vector<BBS::PatchInfo> patchInfo(sourceDB.getPatchInfo(-1, patchNames[i]));
-    assert (patchInfo.size() == 1);
+    if (patchInfo.size() != 1)
+      throw std::runtime_error("Patch \"" + patchNames[i] + "\" defined more than once in SourceDB");
     // Set the position and apparent flux of the patch.
     Position patchPosition;
     patchPosition[0] = patchInfo[0].getRa();
@@ -154,7 +156,7 @@ makeSourceList (const std::vector<Patch::ConstPtr>& patchList) {
   std::vector<Patch::ConstPtr>::const_iterator pIter=patchList.begin();
   std::vector<Patch::ConstPtr>::const_iterator pEnd =patchList.end();
 
-  uint nSources=0;
+  unsigned int nSources=0;
   for (; pIter!=pEnd; ++pIter) {
     nSources+=(*pIter)->nComponents();
   }
@@ -240,7 +242,7 @@ std::vector<string> makePatchList(SourceDB &sourceDB, std::vector<string> patter
 
 bool checkPolarized(SourceDB &sourceDB,
                     const std::vector<string> &patchNames,
-                    uint nModel)
+                    unsigned int nModel)
 {
   bool polarized = false;
 
@@ -251,7 +253,7 @@ bool checkPolarized(SourceDB &sourceDB,
   while (! sourceDB.atEnd()) {
     sourceDB.getNextSource (src);
     // Use the source if its patch matches a patch name.
-    for (uint i=0; i<nModel; ++i) {
+    for (unsigned int i=0; i<nModel; ++i) {
       if (src.getPatchName() == patchNames[i]) {
         // Determine whether source is unpolarized.
         if (src.getV() > 0.0 || src.getQ() > 0.0 || src.getU() > 0.0) {

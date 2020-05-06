@@ -57,29 +57,28 @@ namespace DP3 {
       H5Parm::SolTab soltab = h5parm.getSolTab(soltabName);
 
       vector<string> h5directions = soltab.getStringAxis("dir");
+      if(h5directions.empty())
+        throw std::runtime_error("H5Parm has empty dir axis");
 
       string operation = parset.getString(prefix+"operation", "replace");
 
       if (itsDirections.empty()) {
         itsDirections = h5directions;
       } else {
-        for (vector<string>::iterator it = itsDirections.begin();
-          // Check that all specified directions are in the h5parm
-          it != itsDirections.end(); ++it) {
-          if (find(h5directions.begin(), h5directions.end(), *it) ==
+        // Check that all specified directions are in the h5parm
+        for (const string& dirStr : itsDirections) {
+          if (find(h5directions.begin(), h5directions.end(), dirStr) ==
               h5directions.end()) {
-            throw Exception("Direction " + *it + " not found in " + itsH5ParmName);
+            throw Exception("Direction " + dirStr + " not found in " + itsH5ParmName);
           }
         }
       }
 
-      assert(!itsDirections.empty());
-
-      for (uint i=0; i<itsDirections.size(); ++i) {
+      for (unsigned int i=0; i<itsDirections.size(); ++i) {
         string directionStr = itsDirections[i];
         vector<string> directionVec; // each direction should be like '[patch1,patch2]'
-        assert(directionStr.size()>2 && directionStr[0]=='[' &&
-               directionStr[directionStr.size()-1]==']');
+        if(directionStr.size()<=2 || directionStr[0]!='[' || directionStr[directionStr.size()-1]!=']')
+          throw std::runtime_error("Invalid direction string: expecting array between square brackets, e.g. [a, b]");
         directionVec = StringUtil::tokenize(directionStr.substr(1, directionStr.size()-2), ",");
         Predict* predictStep = new Predict(input, parset, prefix, directionVec);
 
@@ -120,7 +119,7 @@ namespace DP3 {
       os << "H5ParmPredict " << itsName << '\n';
       os << "  H5Parm:     " << itsH5ParmName << '\n';
       os << "  directions: " << itsDirections << '\n';
-      for (uint dir=0; dir<itsPredictSteps.size(); ++dir) {
+      for (unsigned int dir=0; dir<itsPredictSteps.size(); ++dir) {
         itsPredictSteps[dir]->show(os);
       }
     }
