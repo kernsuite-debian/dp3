@@ -41,7 +41,7 @@ namespace BBS {
 
 
   // Define the type of a parmId.
-  typedef uint ParmId;
+  typedef unsigned int ParmId;
 
 
   // @ingroup ParmDB
@@ -82,19 +82,19 @@ namespace BBS {
     ParmId find (const string& name) const;
 
     // Get the ParmDBs used in the ParmSet.
-    const vector<ParmDB*> getDBs() const
+    const std::vector<ParmDB*> getDBs() const
       { return itsDBs; }
 
     // Get the values for the given work domain for all parameters that are
     // not part of the given vector.
     // It means that the vector gets extended for all parameters at the end
     // of itsParms.
-    void getValues (vector<ParmValueSet>&, const Box& workDomain) const;
+    void getValues (std::vector<ParmValueSet>&, const Box& workDomain) const;
 
     // Write the parm values for the given parmid.
     // For parms with a new name, ParmKey::itsNameId will get filled in.
     // For new values, the rowId in the ParmValueSet will be filled in.
-    void write (uint parmId, ParmValueSet&);
+    void write (unsigned int parmId, ParmValueSet&);
 
     // Clear the ParmSet.
     void clear();
@@ -149,8 +149,8 @@ namespace BBS {
     };
 
     //# Data members of ParmSet.
-    vector<ParmDB*> itsDBs;
-    vector<ParmKey> itsParms;
+    std::vector<ParmDB*> itsDBs;
+    std::vector<ParmKey> itsParms;
     std::map<std::string,int> itsNames;
   };
 

@@ -82,11 +82,11 @@ namespace BBS {
     // </group>
 
     // Get the default step values for the axes.
-    const vector<double>& getDefaultSteps() const
+    const std::vector<double>& getDefaultSteps() const
       { return itsDefSteps; }
 
     // Set the default step values.
-    virtual void setDefaultSteps (const vector<double>&) = 0;
+    virtual void setDefaultSteps (const std::vector<double>&) = 0;
 
     // Get the parameter values for the given parameters and domain.
     // Only * and ? should be used in the pattern (no [] and {}).
@@ -97,9 +97,9 @@ namespace BBS {
 
     // Get the parameter values for the given parameters and domain.
     // The parmids form the indices in the result vector.
-    virtual void getValues (vector<ParmValueSet>& values,
-                            const vector<uint>& nameIds,
-                            const vector<ParmId>& parmIds,
+    virtual void getValues (std::vector<ParmValueSet>& values,
+                            const std::vector<unsigned int>& nameIds,
+                            const std::vector<ParmId>& parmIds,
                             const Box& domain) = 0;
 
     // Put the values for the given parameter name and id.
@@ -170,7 +170,7 @@ namespace BBS {
 
   protected:
     // Set the i-th default step value (i<2) in order x,y.
-    void setDefStep (uint i, double value)
+    void setDefStep (unsigned int i, double value)
       { itsDefSteps[i] = value; }
 
   private:
@@ -182,7 +182,7 @@ namespace BBS {
     int        itsSeqNr;
     bool       itsDefFilled;
     ParmMap    itsDefValues;
-    vector<double> itsDefSteps;
+    std::vector<double> itsDefSteps;
   };
 
 
@@ -230,11 +230,11 @@ namespace BBS {
     // </group>
 
     // Get the default step values for the axes.
-    const vector<double>& getDefaultSteps() const
+    const std::vector<double>& getDefaultSteps() const
       { return itsRep->getDefaultSteps(); }
 
     // Set the default step values.
-    void setDefaultSteps (const vector<double>& steps)
+    void setDefaultSteps (const std::vector<double>& steps)
       { itsRep->setDefaultSteps (steps); }
 
     // Get the parameter values for the given parameters and domain.
@@ -246,9 +246,9 @@ namespace BBS {
 
     // Get the parameter values for the given parameters and domain.
     // The parmids form the indices in the result vector.
-    void getValues (vector<ParmValueSet>& values,
-                    const vector<uint>& nameIds,
-                    const vector<ParmId>& parmIds,
+    void getValues (std::vector<ParmValueSet>& values,
+                    const std::vector<unsigned int>& nameIds,
+                    const std::vector<ParmId>& parmIds,
                     const Box& domain)
       { itsRep->getValues (values, nameIds, parmIds, domain); }
 
@@ -307,7 +307,7 @@ namespace BBS {
 
     // Get the ParmDB object of the opened database for the given index.
     // An exception is thrown if not found.
-    static ParmDB getParmDB (uint index);
+    static ParmDB getParmDB (unsigned int index);
 
   private:
     // Create a ParmDB object for an existing ParmDBRep.

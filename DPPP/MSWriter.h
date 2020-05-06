@@ -91,6 +91,8 @@ namespace DP3 {
       static void writeHistory (casacore::Table& ms,
                                 const ParameterSet& parset);
 
+      static void updateBeam (const std::string& outName, const std::string& outColName, const DPInfo& info);
+
     private:
       // Create an array column description and add to table with given
       // stoage manager (if given).
@@ -101,7 +103,7 @@ namespace DP3 {
       // All output columns in the main table are using normal storage managers.
       // The SPECTRAL_WINDOW table is adapted as needed.
       void createMS (const std::string& outName, const DPInfo& info,
-                     uint tileSize, uint tileNChan);
+                     unsigned int tileSize, unsigned int tileNChan);
 
       // Update the SPECTRAL_WINDOW table for averaged channels.
       void updateSpw (const string& outName, const DPInfo& info);
@@ -110,8 +112,8 @@ namespace DP3 {
       void updateObs (const string& outName);
 
       // Update the FIELD table with the new phase center.
-      void updateField (const string& outName, const DPInfo& info);
-
+      void updatePhaseCentre (const string& outName, const DPInfo& info);
+      
       // Write the data, flags, etc.
       void writeData (casacore::Table& out, const DPBuffer& buf);
 
@@ -178,16 +180,16 @@ namespace DP3 {
       bool            itsCopyCorrData;
       bool            itsCopyModelData;
       bool            itsWriteFullResFlags;
-      uint            itsTileSize;
-      uint            itsTileNChan;
-      uint            itsNrCorr;
-      uint            itsNrChan;
-      uint            itsNrBl;
-      uint            itsNrTimes;
-      uint            itsNChanAvg;    //# nr of channels in input averaged to 1
-      uint            itsNTimeAvg;    //# nr of times in input averaged to 1
-      uint            itsNrTimesFlush;//# flush every N time slots (0=no flush)
-      uint            itsNrDone;      //# nr of time slots written
+      unsigned int            itsTileSize;
+      unsigned int            itsTileNChan;
+      unsigned int            itsNrCorr;
+      unsigned int            itsNrChan;
+      unsigned int            itsNrBl;
+      unsigned int            itsNrTimes;
+      unsigned int            itsNChanAvg;    //# nr of channels in input averaged to 1
+      unsigned int            itsNTimeAvg;    //# nr of times in input averaged to 1
+      unsigned int            itsNrTimesFlush;//# flush every N time slots (0=no flush)
+      unsigned int            itsNrDone;      //# nr of time slots written
       std::string     itsVdsDir;      //# directory where to put VDS file
       std::string     itsClusterDesc; //# name of clusterdesc file
       NSTimer         itsTimer;

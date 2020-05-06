@@ -81,18 +81,18 @@ namespace DP3 {
 
     void AOFlaggerStep::show (std::ostream& os) const
     {
-      os << "AOFlaggerStep " << itsName << std::endl;
-      os << "  strategy:       " << itsStrategyName << std::endl;
-      os << "  timewindow:     " << itsWindowSize << std::endl;
-      os << "  overlap:        " << itsOverlap << std::endl;
-      os << "  pulsar:         " << itsPulsarMode << std::endl;
-      os << "  pedantic:       " << itsPedantic << std::endl;
-      os << "  keepstatistics: " << itsDoRfiStats << std::endl;
-      os << "  autocorr:       " << itsDoAutoCorr << std::endl;
-      os << "  nthreads (omp)  " << NThreads() << std::endl;
+      os << "AOFlaggerStep " << itsName << '\n';
+      os << "  strategy:       " << itsStrategyName << '\n';
+      os << "  timewindow:     " << itsWindowSize << '\n';
+      os << "  overlap:        " << itsOverlap << '\n';
+      os << "  pulsar:         " << itsPulsarMode << '\n';
+      os << "  pedantic:       " << itsPedantic << '\n';
+      os << "  keepstatistics: " << itsDoRfiStats << '\n';
+      os << "  autocorr:       " << itsDoAutoCorr << '\n';
+      os << "  nthreads (omp)  " << getInfo().nThreads() << '\n';
       os << "  max memory used ";
       formatBytes(os, itsMemoryNeeded);
-      os << std::endl;
+      os << '\n';
     }
 
     void AOFlaggerStep::formatBytes(std::ostream& os, double bytes) {
@@ -102,7 +102,7 @@ namespace DP3 {
         exp++;
       }
 
-      uint origPrec=os.precision();
+      unsigned int origPrec=os.precision();
       os.precision(1);
 
       if (exp==0) {
@@ -137,7 +137,7 @@ namespace DP3 {
       // Determine how much buffer space is needed per time slot.
       // The flagger needs 3 extra work buffers (data+flags) per thread.
       double timeSize = (sizeof(casacore::Complex) + sizeof(bool)) *
-        (infoIn.nbaselines() + 3*NThreads()) * infoIn.nchan() * infoIn.ncorr();
+        (infoIn.nbaselines() + 3*getInfo().nThreads()) * infoIn.nchan() * infoIn.ncorr();
       // If no overlap percentage is given, set it to 1%.
       if (itsOverlapPerc < 0  &&  itsOverlap == 0) {
         itsOverlapPerc = 1;
@@ -149,19 +149,19 @@ namespace DP3 {
           // Determine the overlap (add 0.5 for rounding).
           // If itsOverLap is also given, it is the maximum.
           double tw = nt / (1 + 2*itsOverlapPerc/100);
-          uint overlap = uint(itsOverlapPerc*tw/100 + 0.5);
+          unsigned int overlap = (unsigned int)(itsOverlapPerc*tw/100 + 0.5);
           if (itsOverlap == 0  ||  overlap < itsOverlap) {
             itsOverlap = overlap;
           }
         }
-        itsWindowSize = uint(std::max(1., nt-2*itsOverlap));
+        itsWindowSize = (unsigned int)(std::max(1., nt-2*itsOverlap));
         // Make the window size divide the nr of times nicely (if known).
         // In that way we cannot have a very small last window.
         if (infoIn.ntime() > 0) {
-          uint nwindow = 1 + (infoIn.ntime() - 1) / itsWindowSize;
+          unsigned int nwindow = 1 + (infoIn.ntime() - 1) / itsWindowSize;
           itsWindowSize = 1 + (infoIn.ntime() - 1) / nwindow;
           if (itsOverlapPerc > 0) {
-            uint overlap = uint(itsOverlapPerc*itsWindowSize/100 + 0.5);
+            unsigned int overlap = (unsigned int)(itsOverlapPerc*itsWindowSize/100 + 0.5);
             if (overlap < itsOverlap) {
               itsOverlap = overlap;
             }
@@ -169,7 +169,7 @@ namespace DP3 {
         }
       }
       if (itsOverlap == 0) {
-        itsOverlap = uint(itsOverlapPerc*itsWindowSize/100);
+        itsOverlap = (unsigned int)(itsOverlapPerc*itsWindowSize/100);
       }
       // Check if it all fits in memory.
       itsMemoryNeeded = (itsWindowSize + 2*itsOverlap) * timeSize;
@@ -270,12 +270,12 @@ namespace DP3 {
       getPrevStep()->addToMS (msName);
     }
 
-    void AOFlaggerStep::flag (uint rightOverlap)
+    void AOFlaggerStep::flag (unsigned int rightOverlap)
     {
       // Get the sizes of the axes.
       // Note: OpenMP 2.5 needs signed iteration variables.
       int  nrbl   = itsBuf[0].getData().shape()[2];
-      uint ncorr  = itsBuf[0].getData().shape()[0];
+      unsigned int ncorr  = itsBuf[0].getData().shape()[0];
       if (ncorr!=4)
         throw std::runtime_error("AOFlaggerStep can only handle all 4 correlations");
       // Get antenna numbers in case applyautocorr is true.
@@ -292,10 +292,10 @@ namespace DP3 {
         // wrapped for compatibility with older aoflaggers.
         std::unique_ptr<aoflagger::QualityStatistics> rfiStats;
       };
-      std::vector<ThreadData> threadData(NThreads());
+      std::vector<ThreadData> threadData(getInfo().nThreads());
       
       // Create thread-private counter object.
-      for(size_t t=0; t!=NThreads(); ++t)
+      for(size_t t=0; t!=getInfo().nThreads(); ++t)
       {
         threadData[t].counter.init (getInfo());
         // Create a statistics object for all polarizations.
@@ -311,7 +311,7 @@ namespace DP3 {
                                              4, false)));
       }
       
-      ParallelFor<int> loop(NThreads());
+      ParallelFor<int> loop(getInfo().nThreads());
       loop.Run(0, nrbl, [&](size_t ib, size_t thread)
       {
         // Do autocorrelations only if told so.
@@ -327,7 +327,7 @@ namespace DP3 {
       }); // end of parallel for
         
       // Add the counters to the overall object.
-      for(size_t t=0; t!=NThreads(); ++t)
+      for(size_t t=0; t!=getInfo().nThreads(); ++t)
       {
         itsFlagCounter.add (threadData[t].counter);
         if (itsDoRfiStats)
@@ -347,7 +347,7 @@ namespace DP3 {
       itsTimer.stop();
       // Let the next step process the buffers.
       // If possible, discard the buffer processed to minimize memory usage.
-      for (uint i=0; i<itsWindowSize; ++i) {
+      for (unsigned int i=0; i<itsWindowSize; ++i) {
         getNextStep()->process (itsBuf[i]);
         ///        itsBuf[i] = DPBuffer();
         ///cout << "cleared buffer " << i << endl;
@@ -356,37 +356,37 @@ namespace DP3 {
       // Shift the buffers still needed to the beginning of the vector.
       // This is a bit easier than keeping a wrapped vector.
       // Note it is a cheap operation, because shallow copies are made.
-      for (uint i=0; i<rightOverlap; ++i) {
+      for (unsigned int i=0; i<rightOverlap; ++i) {
         itsBuf[i].copy (itsBuf[i+itsWindowSize]);
         ///cout << "moved buffer " <<i+itsWindowSize<<" to "<< i << endl;
       }
       itsBufIndex = rightOverlap;
     }
 
-    void AOFlaggerStep::flagBaseline (uint leftOverlap, uint windowSize,
-                                      uint rightOverlap, uint bl,
+    void AOFlaggerStep::flagBaseline (unsigned int leftOverlap, unsigned int windowSize,
+                                      unsigned int rightOverlap, unsigned int bl,
                                       FlagCounter& counter,
                                       aoflagger::QualityStatistics& rfiStats)
     {
       NSTimer moveTimer, flagTimer, qualTimer;
       moveTimer.start();
       // Get the sizes of the axes.
-      uint ntime  = leftOverlap + windowSize + rightOverlap;
-      uint nchan  = itsBuf[0].getData().shape()[1];
-      uint blsize = nchan * itsBuf[0].getData().shape()[0];
+      unsigned int ntime  = leftOverlap + windowSize + rightOverlap;
+      unsigned int nchan  = itsBuf[0].getData().shape()[1];
+      unsigned int blsize = nchan * itsBuf[0].getData().shape()[0];
       // Fill the rficonsole buffers and flag.
       // Create the objects for the real and imaginary data of all corr.
       aoflagger::ImageSet imageSet =
         itsAOFlagger.MakeImageSet(ntime, nchan, 8);
       aoflagger::FlagMask origFlags =
         itsAOFlagger.MakeFlagMask(ntime, nchan);
-      const uint iStride = imageSet.HorizontalStride();
-      const uint fStride = origFlags.HorizontalStride();
-      for (uint i=0; i<ntime; ++i) {
+      const unsigned int iStride = imageSet.HorizontalStride();
+      const unsigned int fStride = origFlags.HorizontalStride();
+      for (unsigned int i=0; i<ntime; ++i) {
         const casacore::Complex* data = itsBuf[i].getData().data()  + bl*blsize;
         const bool*   flags = itsBuf[i].getFlags().data() + bl*blsize;
-        for (uint j=0; j<nchan; ++j) {
-          for (uint p=0; p!=4; ++p) {
+        for (unsigned int j=0; j<nchan; ++j) {
+          for (unsigned int p=0; p!=4; ++p) {
             imageSet.ImageBuffer(p*2  )[i + j*iStride] = data->real();
             imageSet.ImageBuffer(p*2+1)[i + j*iStride] = data->imag();
             data++;
@@ -402,9 +402,9 @@ namespace DP3 {
       flagTimer.stop();
       // Put back the true flags and count newly set flags.
       moveTimer.start();
-      for (uint i=leftOverlap; i<windowSize+leftOverlap; ++i) {
+      for (unsigned int i=leftOverlap; i<windowSize+leftOverlap; ++i) {
         bool* flags = itsBuf[i].getFlags().data() + bl*blsize;
-        for (uint j=0; j<nchan; ++j) {
+        for (unsigned int j=0; j<nchan; ++j) {
           // Only set if not already set.
           // If any corr is newly set, set all corr.
           if (! flags[0]) {

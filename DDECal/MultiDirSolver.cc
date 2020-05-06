@@ -68,36 +68,66 @@ void MultiDirSolver::makeStep(const std::vector<std::vector<DComplex> >& solutio
   });
 }
 
-void MultiDirSolver::makeSolutionsFinite(std::vector<std::vector<DComplex> >& solutions, size_t perPol) const
+void MultiDirSolver::makeSolutionsFinite1pol(std::vector<std::vector<DComplex> >& solutions)
 {
   for(std::vector<DComplex>& solVector : solutions)
   {
-    size_t n = solVector.size() / perPol;
-    std::vector<DComplex>::iterator iter = solVector.begin();
-    for(size_t i=0; i!=n; ++i)
+    // Find the average solutions for this channel
+    size_t count = 0;
+    double average = 0.0;
+    for(const std::complex<double>& solution : solVector)
     {
-      bool hasNonFinite = false;
-      for(size_t p=0; p!=perPol; ++p)
+      if(isfinite(solution))
       {
-        hasNonFinite = hasNonFinite || !std::isfinite(iter->real()) || !std::isfinite(iter->imag());
+        average += std::abs(solution);
+        ++count;
       }
-      if(hasNonFinite)
+    }
+    // If no solution was found, replace it by the average abs value
+    if(count == 0)
+      average = 1.0;
+    else
+      average /= count;
+    for(std::complex<double>& solution : solVector)
+    {
+      if(!isfinite(solution))
+       solution = average;
+    }
+  }
+}
+
+void MultiDirSolver::makeSolutionsFinite4pol(std::vector<std::vector<DComplex> >& solutions)
+{
+  for(std::vector<DComplex>& solVector : solutions)
+  {
+    // Find the average abs solution for this channel
+    size_t count = 0;
+    double average[4] = { 0.0, 0.0, 0.0, 0.0 };
+    for(std::vector<DComplex>::iterator iter=solVector.begin(); iter!=solVector.end(); iter+=4)
+    {
+      if(Matrix2x2::IsFinite(&*iter))
       {
-        if(perPol == 4)
-        {
-          iter[0] = DComplex(1.0, 0.0);
-          iter[1] = DComplex(0.0, 0.0);
-          iter[2] = DComplex(0.0, 0.0);
-          iter[3] = DComplex(1.0, 0.0);
-        }
-        else {
-          for(size_t p=0; p!=perPol; ++p)
-          {
-            iter[p] = DComplex(1.0, 0.0);
-          }
-        }
+        for(size_t p=0; p!=4; ++p)
+          average[p] += std::abs(iter[0]);
+        ++count;
       }
-      iter += perPol;
+    }
+    if(count == 0)
+    {
+      average[0] = 1.0; average[1] = 0.0;
+      average[2] = 0.0; average[3] = 1.0;
+    }
+    else {
+      for(size_t p=0; p!=4; ++p)
+        average[p] /= count;
+    }
+    for(std::vector<DComplex>::iterator iter=solVector.begin(); iter!=solVector.end(); iter+=4)
+    {
+      if(!Matrix2x2::IsFinite(&*iter))
+      {
+        for(size_t p=0; p!=4; ++p)
+          iter[p] = average[p];
+      }
     }
   }
 }
@@ -246,20 +276,18 @@ MultiDirSolver::SolveResult MultiDirSolver::processScalar(
   stepMagnitudes.reserve(_maxIterations);
 
   do {
-    makeSolutionsFinite(solutions, 1);
+    makeSolutionsFinite1pol(solutions);
     
     DP3::ParallelFor<size_t> loop(_nThreads);
     loop.Run(0, _nChannelBlocks, [&](size_t chBlock, size_t /*thread*/)
     {
       performScalarIteration(chBlock, gTimesCs[chBlock], vs[chBlock],
-                            solutions[chBlock], nextSolutions[chBlock],
-                            _buffer.Data(), _buffer.ModelData());
+                            solutions[chBlock], nextSolutions[chBlock]);
     });
       
     makeStep(solutions, nextSolutions);
     
     constraintsSatisfied = true;
-    _timerConstrain.Start();
 
     if(statStream)
     {
@@ -275,7 +303,6 @@ MultiDirSolver::SolveResult MultiDirSolver::processScalar(
       _constraints[i]->PrepareIteration(hasPreviouslyConverged, iteration, iteration+1 >= _maxIterations);
       result._results[i] = _constraints[i]->Apply(nextSolutions, time, statStream);
     }
-    _timerConstrain.Pause();
     
     if(!constraintsSatisfied)
       constrainedIterations = iteration+1;
@@ -309,9 +336,7 @@ void MultiDirSolver::performScalarIteration(size_t channelBlockIndex,
                        std::vector<Matrix>& gTimesCs,
                        std::vector<Matrix>& vs,
                        const std::vector<DComplex>& solutions,
-                       std::vector<DComplex>& nextSolutions,
-                       const std::vector<std::vector<Complex>>& data,
-                       const std::vector<std::vector<std::vector<Complex>>>& modelData)
+                       std::vector<DComplex>& nextSolutions)
 {
   for(size_t ant=0; ant!=_nAntennas; ++ant)
   {
@@ -323,7 +348,7 @@ void MultiDirSolver::performScalarIteration(size_t channelBlockIndex,
     channelIndexStart = channelBlockIndex * _nChannels / _nChannelBlocks,
     channelIndexEnd = (channelBlockIndex+1) * _nChannels / _nChannelBlocks,
     curChannelBlockSize = channelIndexEnd - channelIndexStart,
-    nTimes = data.size();
+    nTimes = _buffer.Data().size();
   
   // The following loop fills the matrices for all antennas
   for(size_t timeIndex=0; timeIndex!=nTimes; ++timeIndex)
@@ -341,9 +366,9 @@ void MultiDirSolver::performScalarIteration(size_t channelBlockIndex,
         Matrix& v2 = vs[antenna2];
         for(size_t d=0; d!=_nDirections; ++d)
         {
-          modelPtrs[d] = &modelData[timeIndex][d][(channelIndexStart + baseline * _nChannels) * 4];
+          modelPtrs[d] = &_buffer.ModelData()[timeIndex][d][(channelIndexStart + baseline * _nChannels) * 4];
         }
-        const Complex* dataPtr = &data[timeIndex][(channelIndexStart + baseline * _nChannels) * 4];
+        const Complex* dataPtr = &_buffer.Data()[timeIndex][(channelIndexStart + baseline * _nChannels) * 4];
         const size_t p1top2[4] = {0, 2, 1, 3};
         for(size_t ch=channelIndexStart; ch!=channelIndexEnd; ++ch)
         {
@@ -469,7 +494,7 @@ MultiDirSolver::SolveResult MultiDirSolver::processFullMatrix(
     for(size_t ant=0; ant!=_nAntennas; ++ant)
     {
       // Model matrix [2N x 2D] and visibility matrix [2N x 2]
-      // Also space for the auto correlation is reserved, but they will be set to 0.
+      // Space for the auto correlation is also reserved, but they will be set to 0.
       size_t m = _nAntennas * nTimes * curChannelBlockSize * 2;
       size_t n = _nDirections * 2, nrhs = 2;
       gTimesCs[chBlock][ant] = Matrix(m, n);
@@ -490,14 +515,13 @@ MultiDirSolver::SolveResult MultiDirSolver::processFullMatrix(
   step_magnitudes.reserve(_maxIterations);
 
   do {
-    makeSolutionsFinite(solutions, 4);
+    makeSolutionsFinite4pol(solutions);
     
     DP3::ParallelFor<size_t> loop(_nThreads);
     loop.Run(0, _nChannelBlocks, [&](size_t chBlock, size_t /*thread*/)
     {
       performFullMatrixIteration(chBlock, gTimesCs[chBlock], vs[chBlock],
-                                solutions[chBlock], nextSolutions[chBlock],
-                                _buffer.Data(), _buffer.ModelData());
+                                solutions[chBlock], nextSolutions[chBlock]);
     });
     
     makeStep(solutions, nextSolutions);
@@ -534,7 +558,7 @@ MultiDirSolver::SolveResult MultiDirSolver::processFullMatrix(
   } while(iteration < _maxIterations && (!hasConverged || !constraintsSatisfied) && !hasStalled);
  
   // When we have not converged yet, we set the nr of iterations to the max+1, so that
-  // non-converged iterations can be distinguished from converged ones.
+  // non-converged solves can be distinguished from converged ones.
   if((!hasConverged || !constraintsSatisfied) && !hasStalled)
     result.iterations = iteration+1;
   else
@@ -557,9 +581,7 @@ void MultiDirSolver::performFullMatrixIteration(size_t channelBlockIndex,
                              std::vector<Matrix>& gTimesCs,
                              std::vector<Matrix>& vs,
                              const std::vector<DComplex>& solutions,
-                             std::vector<DComplex>& nextSolutions,
-                             const std::vector<std::vector<Complex>>& data,
-                             const std::vector<std::vector<std::vector<Complex>>>& modelData)
+                             std::vector<DComplex>& nextSolutions)
 {
   for(size_t ant=0; ant!=_nAntennas; ++ant)
   {
@@ -571,10 +593,9 @@ void MultiDirSolver::performFullMatrixIteration(size_t channelBlockIndex,
     channelIndexStart = channelBlockIndex * _nChannels / _nChannelBlocks,
     channelIndexEnd = (channelBlockIndex+1) * _nChannels / _nChannelBlocks,
     curChannelBlockSize = channelIndexEnd - channelIndexStart,
-    nTimes = data.size();
+    nTimes = _buffer.Data().size();
   
   // The following loop fills the matrices for all antennas
-  _timerFillMatrices.Start();
   for(size_t timeIndex=0; timeIndex!=nTimes; ++timeIndex)
   {
     std::vector<const Complex*> modelPtrs(_nDirections);
@@ -601,8 +622,8 @@ void MultiDirSolver::performFullMatrixIteration(size_t channelBlockIndex,
           &gTimesC2 = gTimesCs[antenna2],
           &v2 = vs[antenna2];
         for(size_t d=0; d!=_nDirections; ++d)
-          modelPtrs[d] = &modelData[timeIndex][d][(channelIndexStart + baseline * _nChannels) * 4];
-        const Complex* dataPtr = &data[timeIndex][(channelIndexStart + baseline * _nChannels) * 4];
+          modelPtrs[d] = &_buffer.ModelData()[timeIndex][d][(channelIndexStart + baseline * _nChannels) * 4];
+        const Complex* dataPtr = &_buffer.Data()[timeIndex][(channelIndexStart + baseline * _nChannels) * 4];
         for(size_t ch=channelIndexStart; ch!=channelIndexEnd; ++ch)
         {
           const size_t
@@ -636,11 +657,9 @@ void MultiDirSolver::performFullMatrixIteration(size_t channelBlockIndex,
       }
     }
   }
-  _timerFillMatrices.Pause();
   
   // The matrices have been filled; compute the linear solution
   // for each antenna.
-  _timerSolve.Start();
 
   size_t m = _nAntennas * nTimes * curChannelBlockSize * 2;
   size_t n = _nDirections * 2, nrhs = 2;
@@ -666,14 +685,13 @@ void MultiDirSolver::performFullMatrixIteration(size_t channelBlockIndex,
       }
     }
   }
-  _timerSolve.Pause();
 }
 
 void MultiDirSolver::showTimings (std::ostream& os, double duration) const {
   //os << "                " << std::fixed << std::setprecision(2) << _timerSolve.Seconds()/duration << "% spent in solve" << std::endl;
   //os << "                " << std::fixed << std::setprecision(2) << _timerFillMatrices.Seconds()/duration << "% spent in filling matrices" << std::endl;
   if (!_constraints.empty()) {
-    os << "                " << std::fixed << std::setprecision(2) << _timerConstrain.Seconds()/duration << "% spent in constraints" << std::endl;
+    //os << "                " << std::fixed << std::setprecision(2) << _timerConstrain.Seconds()/duration << "% spent in constraints" << std::endl;
     for (auto& constraint: _constraints) {
       constraint->showTimings(os, duration);
     }

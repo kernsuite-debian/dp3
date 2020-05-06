@@ -65,26 +65,26 @@ namespace DP3 {
       void init (const DPInfo& info);
 
       // Increment the count per baseline.
-      void incrBaseline (uint bl)
+      void incrBaseline (unsigned int bl)
         { itsBLCounts[bl]++; }
 
       // Increment the count per channel.
-      void incrChannel (uint chan)
+      void incrChannel (unsigned int chan)
         { itsChanCounts[chan]++; }
 
       // Increment the count per correlation.
-      void incrCorrelation (uint corr)
+      void incrCorrelation (unsigned int corr)
         { itsCorrCounts[corr]++; }
 
       // Add the contents of that to this.
       void add (const FlagCounter& that);
 
       // Get the counts.
-      const vector<int64_t>& baselineCounts() const
+      const std::vector<int64_t>& baselineCounts() const
         { return itsBLCounts; }
-      const vector<int64_t>& channelCounts() const
+      const std::vector<int64_t>& channelCounts() const
         { return itsChanCounts; }
-      const vector<int64_t>& correlationCounts() const
+      const std::vector<int64_t>& correlationCounts() const
         { return itsCorrCounts; }
 
       // Print the counts and optionally save percentages in a table.
@@ -112,9 +112,9 @@ namespace DP3 {
       string        itsSaveName;
       double        itsWarnPerc;
       bool          itsShowFF;
-      vector<int64_t> itsBLCounts;
-      vector<int64_t> itsChanCounts;
-      vector<int64_t> itsCorrCounts;
+      std::vector<int64_t> itsBLCounts;
+      std::vector<int64_t> itsChanCounts;
+      std::vector<int64_t> itsCorrCounts;
     };
 
   } //# end namespace

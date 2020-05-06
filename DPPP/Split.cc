@@ -31,7 +31,6 @@
 
 #include <stddef.h>
 
-#include <cassert>
 #include <iostream>
 #include <string>
 #include <sstream>
@@ -45,22 +44,21 @@ namespace DP3 {
 
     Split::Split (DPInput* input,
                   const ParameterSet& parset,
-                  const string& prefix)
+                  const string& prefix):
+      itsAddedToMS(false)
     {
       itsReplaceParms = parset.getStringVector(prefix + "replaceparms");
       vector<vector<string> > replaceParmValues; // For each of the parameters, the values for each substep
       replaceParmValues.resize(itsReplaceParms.size());
 
       vector<vector<string> >::iterator replaceParmValueIt = replaceParmValues.begin();
-      vector<string>::iterator replaceParmIt;
-      uint numSteps = 0;
-      for (replaceParmIt = itsReplaceParms.begin();
-           replaceParmIt != itsReplaceParms.end(); ++replaceParmIt) {
-        vector<string> parmValues = parset.getStringVector(*replaceParmIt);
+      unsigned int numSteps = 0;
+      for (const string& replaceParm : itsReplaceParms) {
+        vector<string> parmValues = parset.getStringVector(replaceParm);
         *(replaceParmValueIt++) = parmValues;
         if (numSteps > 0) {
           if(parmValues.size() != numSteps)
-            throw Exception("Each parameter in replaceparms should have the same number of items (expected " + std::to_string(numSteps) + ", got " + std::to_string(parmValues.size()) + " for step " + *replaceParmIt);
+            throw Exception("Each parameter in replaceparms should have the same number of items (expected " + std::to_string(numSteps) + ", got " + std::to_string(parmValues.size()) + " for step " + replaceParm);
         } else {
           numSteps = parmValues.size();
         }
@@ -70,16 +68,15 @@ namespace DP3 {
       ParameterSet parsetCopy(parset);
 
       // Create the substeps
-      uint numParameters = itsReplaceParms.size();
-      for (uint i = 0; i<numSteps; ++i) {
-        for (uint j = 0; j<numParameters; ++j) {
+      unsigned int numParameters = itsReplaceParms.size();
+      for (unsigned int i = 0; i<numSteps; ++i) {
+        for (unsigned int j = 0; j<numParameters; ++j) {
           parsetCopy.replace(itsReplaceParms[j], replaceParmValues[j][i]);
         }
         DPStep::ShPtr firstStep = DPRun::makeSteps (parsetCopy, prefix, input);
         firstStep->setPrevStep(this);
         itsSubsteps.push_back(firstStep);
       }
-      assert(itsSubsteps.size()>0);
     }
 
     Split::~Split()
@@ -100,9 +97,9 @@ namespace DP3 {
       os << "Split " << itsName << '\n'
          << "  replace parameters:" << itsReplaceParms << '\n';
       // Show the steps.
-      for (uint i=0; i<itsSubsteps.size(); ++i) {
+      for (unsigned int i=0; i<itsSubsteps.size(); ++i) {
         os << "Split substep "<<(i+1)<<" of "<<itsSubsteps.size()<<endl;
-        DPStep::ShPtr step = itsSubsteps[0];
+        DPStep::ShPtr step = itsSubsteps[i];
         DPStep::ShPtr lastStep;
         while (step) {
           step->show (os);
@@ -114,7 +111,7 @@ namespace DP3 {
 
     void Split::showTimings (std::ostream& os, double duration) const
     {
-      for (uint i=0; i<itsSubsteps.size(); ++i) {
+      for (unsigned int i=0; i<itsSubsteps.size(); ++i) {
         DPStep::ShPtr step = itsSubsteps[i];
         while (step) {
           step->showTimings(os, duration);
@@ -125,18 +122,35 @@ namespace DP3 {
 
     bool Split::process (const DPBuffer& bufin)
     {
-      for (uint i=0; i<itsSubsteps.size(); ++i) {
+      for (unsigned int i=0; i<itsSubsteps.size(); ++i) {
         itsSubsteps[i]->process(bufin);
       }
       return false;
     }
 
-
     void Split::finish()
     {
       // Let the next steps finish.
-      for (uint i=0; i<itsSubsteps.size(); ++i) {
+      for (unsigned int i=0; i<itsSubsteps.size(); ++i) {
         itsSubsteps[i]->finish();
+      }
+    }
+
+    void Split::addToMS (const string& msName)
+    {
+      if (itsAddedToMS) {
+        getPrevStep()->addToMS (msName);
+      } else {
+        itsAddedToMS = true;
+        for (auto &subStep: itsSubsteps) {
+          DPStep::ShPtr step, lastStep;
+          step = subStep;
+          while (step) {
+            lastStep = step;
+            step = step->getNextStep();
+          }
+          lastStep->addToMS(msName);
+        }
       }
     }
   } //# end namespace

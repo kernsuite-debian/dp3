@@ -76,22 +76,22 @@ namespace BBS {
     void setSolveGrid (const Grid& solveGrid);
 
     // Get the nr of coefficients.
-    uint getCoeffSize (bool useMask=true);
+    unsigned int getCoeffSize (bool useMask=true);
 
     // Get the coefficients for the given location in the solve grid.
     // The solve grid must have been set before.
-    vector<double> getCoeff (const Location&, bool useMask=true);
+    std::vector<double> getCoeff (const Location&, bool useMask=true);
 
     // Get the errors for the given location in the solve grid.
     // The solve grid must have been set before.
-    vector<double> getErrors (const Location&, bool useMask=true);
+    std::vector<double> getErrors (const Location&, bool useMask=true);
 
     // Set the coefficients for the given location in the solve grid.
     // If given, the errors are set too.
     // The solve grid must have been set before.
     // It sets the dirty flag, so the data are written when the ParmCache
     // is flushed.
-    void setCoeff (const Location&, const double* values, uint nvalues,
+    void setCoeff (const Location&, const double* values, unsigned int nvalues,
                    const double* errors=0, bool useMask=true);
 
     // Revert to the original coefficients (as on disk).
@@ -101,11 +101,11 @@ namespace BBS {
 
     // Get the perturbations for the coefficients.
     // The possible mask is applied.
-    const vector<double>& getPerturbations() const
+    const std::vector<double>& getPerturbations() const
       { return itsPerturbations; }
 
     // Get a particular perturbation.
-    double getPerturbation (uint index)
+    double getPerturbation (unsigned int index)
       { return itsPerturbations.at (index); }
 
     // Get the result for the given grid. No perturbed values are calculated.
@@ -132,11 +132,11 @@ namespace BBS {
     // Otherwise only the first array in the vector is filled in.
     // As above, the shape of the array is normally [nx,ny],
     // but can be [1,1] if constant.
-    void getResult (vector<casacore::Array<double> >& result,
+    void getResult (std::vector<casacore::Array<double> >& result,
                     const Grid& predictGrid, bool perturb);
 
     // Form the vector from values and mask.
-    static vector<double> copyValues (const casacore::Array<double>& values,
+    static std::vector<double> copyValues (const casacore::Array<double>& values,
                                       const casacore::Array<bool>& mask,
                                       bool useMask);
 
@@ -144,7 +144,7 @@ namespace BBS {
     static void getResultCoeff (casacore::Array<double>* resultVec,
                                 const Grid& predictGrid,
                                 const ParmValueSet& pvset,
-                                const vector<double>& perturbations,
+                                const std::vector<double>& perturbations,
                                 AxisMappingCache& axisMappingCache);
 
     // Get the result for a single ParmValue with an array of scalars.
@@ -174,7 +174,7 @@ namespace BBS {
     ParmCache*     itsCache;
     ParmId         itsParmId;
     Grid           itsSolveGrid;
-    vector<double> itsPerturbations;
+    std::vector<double> itsPerturbations;
   };
 
   // @}

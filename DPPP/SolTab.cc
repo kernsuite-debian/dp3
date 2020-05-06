@@ -5,7 +5,9 @@
 #include "../Common/StringUtil.h"
 
 #include <algorithm>
+#include <cassert>
 #include <cstdlib>
+#include <cmath>
 #include <cstring>
 #include <iostream>
 #include <ctime>
@@ -47,12 +49,12 @@ namespace DP3 {
   H5Parm::SolTab::~SolTab() {
   }
 
-  H5Parm::AxisInfo H5Parm::SolTab::getAxis(uint i) const {
+  H5Parm::AxisInfo H5Parm::SolTab::getAxis(unsigned int i) const {
     return _axes[i];
   }
 
   H5Parm::AxisInfo H5Parm::SolTab::getAxis(const string& axisName) const {
-    for (uint i=0; i<_axes.size(); ++i) {
+    for (unsigned int i=0; i<_axes.size(); ++i) {
       if (_axes[i].name == axisName) {
         return _axes[i];
       }
@@ -69,7 +71,7 @@ namespace DP3 {
   }
 
   size_t H5Parm::SolTab::getAxisIndex(const string& axisName) {
-    for (uint i=0; i<_axes.size(); ++i) {
+    for (unsigned int i=0; i<_axes.size(); ++i) {
       if (_axes[i].name == axisName) {
         return i;
       }
@@ -84,7 +86,7 @@ namespace DP3 {
     size_t expectedsize = 1;
     string axesstr = _axes[0].name;
     vector<hsize_t> dims(_axes.size());
-    for (uint i=0; i<_axes.size(); ++i) {
+    for (unsigned int i=0; i<_axes.size(); ++i) {
       dims[i] = _axes[i].size;
       expectedsize *= dims[i];
       if (i>0) {
@@ -95,11 +97,11 @@ namespace DP3 {
     if(expectedsize != vals.size())
       throw Exception("Values for H5Parm do not have the expected size: they have size " + std::to_string(vals.size()) + ", expected is " + std::to_string(expectedsize));
 
-    H5::DataSpace dataspace(dims.size(), &(dims[0]), NULL);
+    H5::DataSpace dataspace(dims.size(), dims.data(), NULL);
     H5::DataSet dataset = createDataSet("val", H5::PredType::IEEE_F64LE,
                                         dataspace);
 
-    dataset.write(&(vals[0]), H5::PredType::IEEE_F64LE);
+    dataset.write(vals.data(), H5::PredType::IEEE_F64LE);
 
     H5::Attribute attr = dataset.createAttribute("AXES",
                              H5::StrType(H5::PredType::C_S1, axesstr.size()),
@@ -140,12 +142,25 @@ namespace DP3 {
                                           dataspace);
 
     // If weights are empty, write ones everywhere
+    vector<double> fullweights;
     if (weights.empty()) {
-      vector<double> fullweights(vals.size(), 1);
-      weightset.write(&(fullweights[0]), H5::PredType::IEEE_F64LE);
+      fullweights.resize(vals.size(), 1.0);
     } else {
-      weightset.write(&(weights[0]), H5::PredType::IEEE_F64LE);
+      if (weights.size() != vals.size()) {
+        throw Exception("Values for H5Parm weights do not have the expected size: they have size " + std::to_string(weights.size()) + ", expected is " + std::to_string(vals.size()));
+      }
+      // Copy weights so that they can be changed (to add flags)
+      fullweights = weights;
     }
+
+    // Set weight of NaN values to 0.
+    for (size_t i=0; i<vals.size(); ++i) {
+      if (std::isnan(vals[i])) {
+        fullweights[i] = 0.;
+      }
+    }
+
+    weightset.write(fullweights.data(), H5::PredType::IEEE_F64LE);
 
     attr = weightset.createAttribute("AXES",
                              H5::StrType(H5::PredType::C_S1, axesstr.size()),
@@ -189,15 +204,16 @@ namespace DP3 {
     axesattr.read(axesattr.getDataType(), &axescstr);
     vector<string> axesnames = StringUtil::tokenize(axescstr,",");
 
-    uint ndims = axesnames.size();
+    unsigned int ndims = axesnames.size();
 
     // Get number of dimensions and size of all dimensions
     H5::DataSpace ds = val.getSpace();
-    assert (ds.getSimpleExtentNdims() == int(ndims));
+    if(ds.getSimpleExtentNdims() != int(ndims))
+      throw std::runtime_error("H5Parm is inconsistent: number of axes in data does not match number of axes in metadata");
     hsize_t dims_out[ndims];
     ds.getSimpleExtentDims(dims_out);
 
-    for (uint i=0; i<axesnames.size(); ++i) {
+    for (unsigned int i=0; i<axesnames.size(); ++i) {
       AxisInfo a(axesnames[i], dims_out[i]);
       _axes.push_back(a);
     }
@@ -216,15 +232,15 @@ namespace DP3 {
               const string& antName,
               const vector<double>& times,
               const vector<double>& freqs,
-              uint pol, uint dir) {
+              unsigned int pol, unsigned int dir, bool nearest) {
     vector<double> res(times.size()*freqs.size());
 
-    uint startTimeSlot = 0;
-    uint ntimeH5 = 1;
+    unsigned int startTimeSlot = 0;
+    unsigned int ntimeH5 = 1;
 
     assert(!freqs.empty());
-    uint startFreq = 0;
-    uint nfreqH5 = 1;
+    unsigned int startFreq = 0;
+    unsigned int nfreqH5 = 1;
 
     vector<double> interpolated(times.size()*freqs.size());
 
@@ -249,8 +265,9 @@ namespace DP3 {
 
     gridNearestNeighbor(timeAxisH5, freqAxisH5,
                         times, freqs,
-                        &(h5values[0]),
-                        &(interpolated[0]));
+                        h5values.data(),
+                        interpolated.data(),
+                        nearest);
 
     return interpolated;
   }
@@ -258,9 +275,9 @@ namespace DP3 {
   vector<double> H5Parm::SolTab::getValuesOrWeights(
               const string& valOrWeight,
               const string& antName,
-              uint starttimeslot, uint ntime, uint timestep,
-              uint startfreq, uint nfreq, uint freqstep,
-              uint pol, uint dir) {
+              unsigned int starttimeslot, unsigned int ntime, unsigned int timestep,
+              unsigned int startfreq, unsigned int nfreq, unsigned int freqstep,
+              unsigned int pol, unsigned int dir) {
     vector<double> res(ntime*nfreq);
     H5::DataSet val = openDataSet(valOrWeight);
 
@@ -270,7 +287,7 @@ namespace DP3 {
     hsize_t count[_axes.size()];
     hsize_t stride[_axes.size()];
 
-    for (uint i=0; i<_axes.size(); ++i) {
+    for (unsigned int i=0; i<_axes.size(); ++i) {
       stride[i] = 1;
       count[i] = 1;
       memdims[i] = 1;
@@ -291,7 +308,8 @@ namespace DP3 {
       } else if (_axes[i].name=="pol") {
         offset[i] = pol;
       } else {
-        assert(_axes[i].size == 1);
+        if(_axes[i].size != 1)
+          throw std::runtime_error("Axis \"" + _axes[i].name + "\" in H5Parm is not understood");
         offset[i] = 0;
       }
     }
@@ -303,16 +321,16 @@ namespace DP3 {
     // Setup memory dataspace
     H5::DataSpace memspace(_axes.size(), memdims);
     try {
-      val.read(&(res[0]), H5::PredType::NATIVE_DOUBLE, memspace, dataspace);
+      val.read(res.data(), H5::PredType::NATIVE_DOUBLE, memspace, dataspace);
     } catch (H5::DataSetIException& e) {
-      e.printError();
+      e.printErrorStack();
       throw Exception("Could not read data");
     }
     return res;
   }
 
   void H5Parm::SolTab::setAntennas(const vector<string>& solAntennas) {
-    // TODO: assert that antenna is present in antenna table in solset
+    // TODO: check that antenna is present in antenna table in solset
     hsize_t dims[1];
     dims[0]=solAntennas.size();
 
@@ -322,7 +340,7 @@ namespace DP3 {
 
     // Prepare data
     char antArray[solAntennas.size()][16];
-    for (uint i=0; i<solAntennas.size(); ++i) {
+    for (unsigned int i=0; i<solAntennas.size(); ++i) {
       strncpy(antArray[i], solAntennas[i].c_str(), 16);
     }
 
@@ -344,7 +362,7 @@ namespace DP3 {
     if (metaVals.size()>0) {
       // Prepare data
       char srcArray[metaVals.size()][nChar];
-      for (uint i=0; i<metaVals.size(); ++i) {
+      for (unsigned int i=0; i<metaVals.size(); ++i) {
         strncpy(srcArray[i], metaVals[i].c_str(), nChar);
       }
 
@@ -380,7 +398,7 @@ namespace DP3 {
                                         H5::PredType::IEEE_F64LE, dataspace);
 
     if (metaVals.size() > 0) {
-      dataset.write(&(metaVals[0]), H5::PredType::IEEE_F64LE);
+      dataset.write(metaVals.data(), H5::PredType::IEEE_F64LE);
     }
   }
 
@@ -398,11 +416,12 @@ namespace DP3 {
     } catch (H5::GroupIException& e) {
       throw Exception("SolTab has no table " + tableName);
     }
-    assert(dataspace.getSimpleExtentNdims()==1);
+    if(dataspace.getSimpleExtentNdims()!=1)
+      throw std::runtime_error("Invalid H5Parm: table \"" + tableName + "\" should be onedimensional");
     hsize_t dims[1];
     dataspace.getSimpleExtentDims(dims);
 
-    // TODO: assert that DataType is String
+    // TODO: check that DataType is String
     hsize_t strLen = dataset.getDataType().getSize();
 
     char elNames[strLen*dims[0]];
@@ -474,13 +493,14 @@ namespace DP3 {
     } catch (H5::GroupIException& e) {
       throw Exception("SolTab " + getName() + " has no axis '" + axisname + "'");
     }
-    assert(dataspace.getSimpleExtentNdims()==1);
+    if(dataspace.getSimpleExtentNdims()!=1)
+      throw std::runtime_error("Something wrong with H5Parm: dataspace.getSimpleExtentNdims()!=1");
 
     hsize_t dims[1];
     dataspace.getSimpleExtentDims(dims);
 
     vector<double> data(dims[0]);
-    dataset.read(&(data[0]), H5::PredType::NATIVE_DOUBLE);
+    dataset.read(data.data(), H5::PredType::NATIVE_DOUBLE);
 
     return data;
   }
@@ -541,7 +561,8 @@ namespace DP3 {
     } catch (H5::GroupIException& e) {
       throw Exception("SolTab " + getName() + " has no axis table for " + axisName);
     }
-    assert(dataspace.getSimpleExtentNdims()==1);
+    if(dataspace.getSimpleExtentNdims()!=1)
+      throw std::runtime_error("Invalid H5Parm: table \"" + axisName + "\" should be onedimensional");
 
     hsize_t dims[1];
     dataspace.getSimpleExtentDims(dims);
@@ -557,7 +578,7 @@ namespace DP3 {
 
     // Get only two values
     vector<double> values(2);
-    dataset.read(&(values[0]), H5::PredType::NATIVE_DOUBLE, memspace, dataspace);
+    dataset.read(values.data(), H5::PredType::NATIVE_DOUBLE, memspace, dataspace);
     return values[1]-values[0];
   }
 }

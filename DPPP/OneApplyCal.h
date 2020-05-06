@@ -54,6 +54,8 @@ namespace DP3 {
       // Define the shared pointer for this type.
       typedef std::shared_ptr<OneApplyCal> ShPtr;
 
+      enum class InterpolationType {NEAREST, LINEAR};
+
       enum CorrectType {GAIN, FULLJONES, TEC, CLOCK, ROTATIONANGLE, SCALARPHASE, PHASE,
                         ROTATIONMEASURE, SCALARAMPLITUDE, AMPLITUDE};
 
@@ -101,7 +103,7 @@ namespace DP3 {
       void initDataArrays();
 
       // Check the number of polarizations in the parmdb or h5parm
-      uint nPol(const std::string& parmName);
+      unsigned int nPol(const std::string& parmName);
 
       // Replace values by NaN on places where weight is zero
       static void applyFlags(std::vector<double>& values,
@@ -124,19 +126,20 @@ namespace DP3 {
       H5Parm::SolTab   itsSolTab2; // in the case of full Jones, amp and phase table need to be open
       CorrectType      itsCorrectType;
       bool             itsInvert;
-      uint             itsTimeSlotsPerParmUpdate;
+      InterpolationType itsInterpolationType;
+      unsigned int             itsTimeSlotsPerParmUpdate;
       double           itsSigmaMMSE;
       bool             itsUpdateWeights;
 
-      uint             itsCount; // number of steps
+      unsigned int             itsCount; // number of steps
 
       // Expressions to search for in itsParmDB
-      vector<casacore::String>   itsParmExprs;
+      std::vector<casacore::String>   itsParmExprs;
 
       // parameters, numparms, antennas, time x frequency
       casacore::Cube<casacore::DComplex> itsParms;
-      uint            itsTimeStep; // time step within current chunk
-      uint            itsNCorr;
+      unsigned int            itsTimeStep; // time step within current chunk
+      unsigned int            itsNCorr;
       double          itsTimeInterval;
       double          itsLastTime; // last time of current chunk
       FlagCounter     itsFlagCounter;

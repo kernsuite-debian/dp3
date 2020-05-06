@@ -51,7 +51,7 @@ namespace DP3 {
   namespace DPPP {
     // @ingroup NDPPP
 
-    typedef vector<Patch::ConstPtr> PatchList;
+    typedef std::vector<Patch::ConstPtr> PatchList;
 
     // This class is a DPStep class to subtract the strong A-team sources.
     // It is based on the demixing.py script made by Bas vd Tol and operates
@@ -100,16 +100,16 @@ namespace DP3 {
       void makeFactors (const casacore::Array<casacore::DComplex>& bufIn,
                         casacore::Array<casacore::DComplex>& bufOut,
                         const casacore::Cube<float>& weightSums,
-                        uint nChanOut,
-                        uint nChanAvg);
+                        unsigned int nChanOut,
+                        unsigned int nChanAvg);
 
       // Do the demixing.
       void handleDemix();
 
       // Deproject the sources without a model.
       void deproject (casacore::Array<casacore::DComplex>& factors,
-                      vector<MultiResultStep*> avgResults,
-                      uint resultIndex);
+                      std::vector<MultiResultStep*> avgResults,
+                      unsigned int resultIndex);
 
       // Solve gains and subtract sources.
       void demix();
@@ -131,12 +131,12 @@ namespace DP3 {
       size_t                                itsMaxIter;
       BaselineSelection                     itsSelBL;
       Filter                                itsFilter;
-      vector<PhaseShift*>                   itsPhaseShifts;
+      std::vector<PhaseShift*>                   itsPhaseShifts;
       //# Phase shift and average steps for demix.
-      vector<DPStep::ShPtr>                 itsFirstSteps;
+      std::vector<DPStep::ShPtr>                 itsFirstSteps;
       //# Result of phase shifting and averaging the directions of interest
       //# at the demix resolution.
-      vector<MultiResultStep*>              itsAvgResults;
+      std::vector<MultiResultStep*>              itsAvgResults;
       DPStep::ShPtr                         itsAvgStepSubtr;
       Filter*                               itsFilterSubtr;
       //# Result of averaging the target at the subtract resolution.
@@ -146,30 +146,30 @@ namespace DP3 {
       bool                                  itsIgnoreTarget;
       //# Name of the target. Empty if no model is available for the target.
       string                                itsTargetSource;
-      vector<string>                        itsSubtrSources;
-      vector<string>                        itsModelSources;
-      vector<string>                        itsExtraSources;
-      vector<string>                        itsAllSources;
-//      vector<double>                        itsCutOffs;
+      std::vector<string>                        itsSubtrSources;
+      std::vector<string>                        itsModelSources;
+      std::vector<string>                        itsExtraSources;
+      std::vector<string>                        itsAllSources;
+//      std::vector<double>                        itsCutOffs;
       bool                                  itsPropagateSolutions;
-      uint                                  itsNDir;
-      uint                                  itsNModel;
-      uint                                  itsNStation;
-      uint                                  itsNBl;
-      uint                                  itsNCorr;
-      uint                                  itsNChanIn;
-      uint                                  itsNTimeIn;
-      uint                                  itsNTimeDemix;
-      uint                                  itsNChanAvgSubtr;
-      uint                                  itsNTimeAvgSubtr;
-      uint                                  itsNChanOutSubtr;
-      uint                                  itsNTimeOutSubtr;
-      uint                                  itsNTimeChunk;
-      uint                                  itsNTimeChunkSubtr;
-      uint                                  itsNChanAvg;
-      uint                                  itsNTimeAvg;
-      uint                                  itsNChanOut;
-      uint                                  itsNTimeOut;
+      unsigned int                                  itsNDir;
+      unsigned int                                  itsNModel;
+      unsigned int                                  itsNStation;
+      unsigned int                                  itsNBl;
+      unsigned int                                  itsNCorr;
+      unsigned int                                  itsNChanIn;
+      unsigned int                                  itsNTimeIn;
+      unsigned int                                  itsNTimeDemix;
+      unsigned int                                  itsNChanAvgSubtr;
+      unsigned int                                  itsNTimeAvgSubtr;
+      unsigned int                                  itsNChanOutSubtr;
+      unsigned int                                  itsNTimeOutSubtr;
+      unsigned int                                  itsNTimeChunk;
+      unsigned int                                  itsNTimeChunkSubtr;
+      unsigned int                                  itsNChanAvg;
+      unsigned int                                  itsNTimeAvg;
+      unsigned int                                  itsNChanOut;
+      unsigned int                                  itsNTimeOut;
       double                                itsTimeIntervalAvg;
 
       //# Accumulator used for computing the demixing weights at the demix
@@ -179,7 +179,7 @@ namespace DP3 {
       //# Buffer of demixing weights at the demix resolution. Each Array is a
       //# cube of shape #correlations x #channels x #baselines of matrices of
       //# shape #directions x #directions.
-      vector<casacore::Array<casacore::DComplex> >  itsFactors;
+      std::vector<casacore::Array<casacore::DComplex> >  itsFactors;
 
       //# Accumulator used for computing the demixing weights. The shape of this
       //# buffer is #correlations x #channels x #baselines x #directions
@@ -188,18 +188,18 @@ namespace DP3 {
       //# Buffer of demixing weights at the subtract resolution. Each Array is a
       //# cube of shape #correlations x #channels x #baselines of matrices of
       //# shape #directions x #directions.
-      vector<casacore::Array<casacore::DComplex> >  itsFactorsSubtr;
+      std::vector<casacore::Array<casacore::DComplex> >  itsFactorsSubtr;
 
       PatchList                             itsPatchList;
       Position                              itsPhaseRef;
-      vector<Baseline>                      itsBaselines;
-      vector<int>                           itsUVWSplitIndex;
+      std::vector<Baseline>                      itsBaselines;
+      std::vector<int>                           itsUVWSplitIndex;
       casacore::Vector<double>                  itsFreqDemix;
       casacore::Vector<double>                  itsFreqSubtr;
-      vector<double>                        itsUnknowns;
-      vector<double>                        itsPrevSolution;
-      uint                                  itsTimeIndex;
-      uint                                  itsNConverged;
+      std::vector<double>                        itsUnknowns;
+      std::vector<double>                        itsPrevSolution;
+      unsigned int                                  itsTimeIndex;
+      unsigned int                                  itsNConverged;
       FlagCounter                           itsFlagCounter;
 
       //# Timers.

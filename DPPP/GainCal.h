@@ -31,7 +31,7 @@
 #include "DPBuffer.h"
 #include "PhaseFitter.h"
 #include "BaselineSelection.h"
-#include "StefCal.h"
+#include "GainCalAlgorithm.h"
 #include "Patch.h"
 #include "UVWFlagger.h"
 #include "Predict.h"
@@ -41,6 +41,8 @@
 #include "../ParmDB/Parm.h"
 #include "../ParmDB/ParmFacade.h"
 #include "../ParmDB/ParmSet.h"
+
+#include "../Common/ParallelFor.h"
 
 #ifdef HAVE_LOFAR_BEAM
 #include <StationResponse/Station.h>
@@ -75,7 +77,7 @@ namespace DP3 {
     {
     public:
 
-      enum CalType {COMPLEXGAIN, SCALARCOMPLEXGAIN, FULLJONES, PHASEONLY, SCALARPHASE, AMPLITUDEONLY,
+      enum CalType {DIAGONAL, SCALARCOMPLEXGAIN, FULLJONES, PHASEONLY, SCALARPHASE, AMPLITUDEONLY,
                     SCALARAMPLITUDE, TECANDPHASE, TEC, TECSCREEN, ROTATIONANDDIAGONAL, ROTATION};
 
       // Construct the object.
@@ -112,8 +114,8 @@ namespace DP3 {
                                                     std::vector<H5Parm::AxisInfo>& axes);
 
     private:
-      // Perform stefcal (polarized or unpolarized)
-      void stefcal();
+      // Perform gaincal (polarized or unpolarized)
+      void calibrate();
 
       // Check for scalar mode
       static bool scalarMode(CalType caltype);
@@ -161,7 +163,7 @@ namespace DP3 {
 
       CalType          itsMode;
 
-      uint             itsDebugLevel;
+      unsigned int             itsDebugLevel;
       bool             itsDetectStalling;
 
       bool             itsApplySolution;
@@ -172,12 +174,15 @@ namespace DP3 {
 
       std::vector<std::unique_ptr<PhaseFitter> > itsPhaseFitters; // Length nSt
 
-      std::vector<StefCal>  iS;
+      std::vector<GainCalAlgorithm>  iS;
 
       UVWFlagger        itsUVWFlagStep;
       ResultStep::ShPtr itsDataResultStep; // Result step for data after UV-flagging
 
       std::unique_ptr<Predict> itsPredictStep;
+      ParallelFor<size_t> itsParallelFor;
+      std::unique_ptr<class ThreadPool> itsThreadPool;
+      std::mutex itsMeasuresMutex;
 #ifdef HAVE_LOFAR_BEAM
       ApplyBeam         itsApplyBeamStep; // Beam step for applying beam to modelcol
 #endif
@@ -192,22 +197,22 @@ namespace DP3 {
 
       std::map<std::string,int>  itsParmIdMap; //# -1 = new parm name
 
-      uint             itsMaxIter;
+      unsigned int             itsMaxIter;
       double           itsTolerance;
       bool             itsPropagateSolutions;
-      uint             itsSolInt;  // Time cell size
-      uint             itsNChan;   // Frequency cell size
-      uint             itsNFreqCells;
+      unsigned int             itsSolInt;  // Time cell size
+      unsigned int             itsNChan;   // Frequency cell size
+      unsigned int             itsNFreqCells;
 
-      uint             itsTimeSlotsPerParmUpdate;
-      uint             itsConverged;
-      uint             itsNonconverged;
-      uint             itsFailed;
-      uint             itsStalled;
-      std::vector<uint>     itsNIter; // Total iterations made (for converged, stalled, nonconverged, failed)
-      uint             itsStepInParmUpdate; // Timestep within parameter update
+      unsigned int             itsTimeSlotsPerParmUpdate;
+      unsigned int             itsConverged;
+      unsigned int             itsNonconverged;
+      unsigned int             itsFailed;
+      unsigned int             itsStalled;
+      std::vector<unsigned int>     itsNIter; // Total iterations made (for converged, stalled, nonconverged, failed)
+      unsigned int             itsStepInParmUpdate; // Timestep within parameter update
       double           itsChunkStartTime; // First time value of chunk to be stored
-      uint             itsStepInSolInt;  // Timestep within solint
+      unsigned int             itsStepInSolInt;  // Timestep within solint
 
       casacore::Array<casacore::DComplex>  itsAllSolutions; // Array that holds all solutions for all iterations
 

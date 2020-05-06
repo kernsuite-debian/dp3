@@ -38,8 +38,6 @@
 #include <casacore/casa/Arrays/Matrix.h>
 #include <casacore/casa/Arrays/Vector.h>
 
-#include <cassert>
-
 using namespace casacore;
 
 namespace DP3 {
@@ -60,7 +58,7 @@ namespace DP3 {
       Matrix<bool> bl(nant, nant, false);
       vector<uInt> rows;
       rows.reserve (nant*nant);
-      for (uint i=0; i<a1.size(); ++i) {
+      for (unsigned int i=0; i<a1.size(); ++i) {
         if (! bl(a1[i], a2[i])) {
           rows.push_back (i);
           bl(a1[i], a2[i]) = true;
@@ -81,7 +79,8 @@ namespace DP3 {
                                               const string& baselineSelection,
                                               std::ostream& os)
   {
-    assert (names.size() == pos.size());
+    if (names.size() != pos.size())
+      throw std::invalid_argument("Name and position arrays are of different size");
     // Create a temporary MSAntenna table in memory for parsing purposes.
     SetupNewTable antNew(String(), MSAntenna::requiredTableDesc(),
                          Table::New);
@@ -119,7 +118,7 @@ namespace DP3 {
     Vector<Int> selectedAnts1;
     Vector<Int> selectedAnts2;
     Matrix<Int> selectedBaselines;
-    MSSelectionErrorHandler* curHandler = MSAntennaParse::thisMSAErrorHandler;
+    auto curHandler = MSAntennaParse::thisMSAErrorHandler;
     BaselineSelectErrorHandler errorHandler (os);
     MSAntennaParse::thisMSAErrorHandler = &errorHandler;
     try {
@@ -133,7 +132,7 @@ namespace DP3 {
       Vector<Int> a2 = ROScalarColumn<Int>(seltab, "ANTENNA2").getColumn();
       int nant = anttab.nrow();
       Matrix<bool> bl(nant, nant, false);
-      for (uint i=0; i<a1.size(); ++i) {
+      for (unsigned int i=0; i<a1.size(); ++i) {
         bl(a1[i], a2[i]) = true;
         bl(a2[i], a1[i]) = true;
       }

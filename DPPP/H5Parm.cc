@@ -17,17 +17,15 @@ using namespace std;
 
 namespace DP3 {
   H5Parm::H5Parm(const std::string& filename, bool forceNew,
-                 bool forceNewSolSet, const std::string& solSetName):
-      H5::H5File(filename,
-                 !forceNew&&boost::filesystem::exists(filename)?H5F_ACC_RDWR:H5F_ACC_TRUNC
-                )
+                 bool forceNewSolSet, const std::string& solSetName) :
+      H5::H5File(filename, forceNew?H5F_ACC_TRUNC:H5F_ACC_RDONLY)
   {
     if (forceNewSolSet || getNumObjs()==0) { // Create a new solSet
       if (solSetName=="") {
         // Get the name of first non-existing solset
         stringstream newSolSetName;
         H5::Group tryGroup;
-        for (uint solSetNum=0; solSetNum<100; ++solSetNum) {
+        for (unsigned int solSetNum=0; solSetNum<100; ++solSetNum) {
           try {
             H5::Exception::dontPrint();
             newSolSetName<<"sol"<<setfill('0')<<setw(3)<<solSetNum;
@@ -60,7 +58,7 @@ namespace DP3 {
       _solSet = openGroup(solSetNameToOpen);
 
       vector<string> solTabNames;
-      for (uint i=0; i<_solSet.getNumObjs();++i) {
+      for (unsigned int i=0; i<_solSet.getNumObjs();++i) {
         if (_solSet.getObjTypeByIdx(i)==H5G_GROUP) {
           solTabNames.push_back(_solSet.getObjnameByIdx(i));
         }
@@ -119,8 +117,9 @@ namespace DP3 {
 
     // Prepare data
     vector<source_t> sources(names.size());
-    for (uint src=0; src<sources.size(); ++src) {
-      std::strncpy(sources[src].name, names[src].c_str(), 128);
+    for (unsigned int src=0; src<sources.size(); ++src) {
+      std::strncpy(sources[src].name, names[src].c_str(), 127);
+      sources[src].name[127] = 0;
       sources[src].dir[0] = dirs[src].first;
       sources[src].dir[1] = dirs[src].second;
     }
@@ -146,8 +145,9 @@ namespace DP3 {
 
     // Prepare data
     vector<antenna_t> ants(names.size());
-    for (uint ant=0; ant<ants.size(); ++ant) {
-      std::strncpy(ants[ant].name, names[ant].c_str(), 16);
+    for (unsigned int ant=0; ant<ants.size(); ++ant) {
+      std::strncpy(ants[ant].name, names[ant].c_str(), 15);
+      ants[ant].name[15] = 0;
       const std::vector<double>& pos = positions[ant];
       ants[ant].position[0] = pos[0];
       ants[ant].position[1] = pos[1];

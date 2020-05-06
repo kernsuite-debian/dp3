@@ -23,17 +23,17 @@
 
 #include <lofar_config.h>
 #include <DPPP/DPRun.h>
-#include <tables/Tables.h>
-#include <tables/Tables/TableIter.h>
-#include <casa/Arrays/ArrayLogical.h>
-#include <casa/Arrays/ArrayMath.h>
-#include <casa/Arrays/ArrayPartMath.h>
+#include <casacore/tables/Tables.h>
+#include <casacore/tables/Tables/TableIter.h>
+#include <casacore/casa/Arrays/ArrayLogical.h>
+#include <casacore/casa/Arrays/ArrayMath.h>
+#include <casacore/casa/Arrays/ArrayPartMath.h>
 #include <Common/LofarLogger.h>
 #include <iostream>
 #include <stdexcept>
 
 using namespace DP3::DPPP;
-using namespace casa;
+using namespace casacore;
 
 // This test program uses the MS in tNDPPP.in_MS.tgz.
 // The MS contains 4 corr, 16 freq, 6 baselines, 18 time slots of 30 sec.
@@ -99,19 +99,19 @@ void checkCopy (const String& in, const String& out, int nms)
     ASSERT (allEQ(ROScalarColumn<double>(t1,"INTERVAL").getColumn(), 30.));
     ASSERT (allEQ(ROScalarColumn<double>(t1,"EXPOSURE").getColumn(), 30.));
     double time = ROScalarColumn<double>(tin,"TIME")(0);
-    for (uint i=0; i<6; ++i) {
+    for (unsigned int i=0; i<6; ++i) {
       double timec = time - 30;
       ASSERT (near(ROScalarColumn<double>(t1,"TIME")(i), timec));
       ASSERT (near(ROScalarColumn<double>(t1,"TIME_CENTROID")(i), timec));
     }
     time = ROScalarColumn<double>(tin,"TIME")(2*6);
-    for (uint i=6; i<18; ++i) {
+    for (unsigned int i=6; i<18; ++i) {
       double timec = time + (i/6)*30.;
       ASSERT (near(ROScalarColumn<double>(t1,"TIME")(i), timec));
       ASSERT (near(ROScalarColumn<double>(t1,"TIME_CENTROID")(i), timec));
     }
     time = ROScalarColumn<double>(tin,"TIME")(17*6);
-    for (uint i=18; i<36; ++i) {
+    for (unsigned int i=18; i<36; ++i) {
       double timec = time + (i/6-2)*30.;
       ASSERT (near(ROScalarColumn<double>(t1,"TIME")(i), timec));
       ASSERT (near(ROScalarColumn<double>(t1,"TIME_CENTROID")(i), timec));
@@ -446,7 +446,7 @@ void testAvg4()
     Table t2 ("tNDPPP_tmp.MS5");
     ASSERT (t2.nrow() == 6*10);
     ROScalarColumn<double> timeCol(t2, "TIME");
-    for (uint i=0; i<t2.nrow(); ++i) {
+    for (unsigned int i=0; i<t2.nrow(); ++i) {
       ASSERT (near(timeCol(i), time));
       if (i%6 == 5) time += 60;
     }

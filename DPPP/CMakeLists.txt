@@ -6,12 +6,13 @@ add_executable(DPPP DPPP.cc
   ${BLOB_OBJECT}
   ${COMMON_OBJECT}
   ${AOFLAGGERSTEP_OBJECT}
-  ${DDECAL_OBJECT})
+  ${DDECAL_OBJECT}
+  ${IDGPREDICT_OBJECT})
 target_link_libraries(DPPP
   ${HDF5_LIBRARIES} ${HDF5_CXX_LIBRARIES}
   ${CASACORE_LIBRARIES}
   ${LOFAR_STATION_RESPONSE_LIB}
-  ${Boost_FILESYSTEM_LIBRARY} ${Boost_SYSTEM_LIBRARY}
+  ${CFITSIO_LIBRARY}
   ${EXTRA_LIBRARIES})
 
 install(TARGETS DPPP DESTINATION bin)
@@ -27,5 +28,3 @@ install(
 python_install(
   __init__.py
   DESTINATION lofar/dppp)
-
-#add_subdirectory(test)

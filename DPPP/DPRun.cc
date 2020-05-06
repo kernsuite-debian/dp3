@@ -135,27 +135,29 @@ namespace DP3 {
 
       bool showcounts = parset.getBool ("showcounts", true);
 
-      uint numThreads = parset.getInt("numthreads", ThreadPool::NCPUS());
+      unsigned int numThreads = parset.getInt("numthreads", 0);
 
-      // Create the steps, link them toggether
+      // Create the steps, link them together
       DPStep::ShPtr firstStep = makeSteps (parset, "", 0);
 
       DPStep::ShPtr step = firstStep;
       DPStep::ShPtr lastStep;
       while (step) {
-        step->setNThreads(numThreads);
         step = step->getNextStep();
       }
       
-      // Call updateInfo() (after setting NThreads())
-      firstStep->setInfo (DPInfo());
+      // Call updateInfo()
+      DPInfo dpInfo;
+      if (numThreads > 0) {
+        dpInfo.setNThreads(numThreads);
+      }
+      firstStep->setInfo (std::move(dpInfo));
 
       // Show the steps.  
       step = firstStep;
       while (step) {
         std::ostringstream os;
         step->show (os);
-        step->setNThreads(numThreads);
         DPLOG_INFO (os.str(), true);
         lastStep = step;
         step = step->getNextStep();
@@ -174,7 +176,7 @@ namespace DP3 {
         }
       }
       // Process until the end.
-      uint ntodo = firstStep->getInfo().ntime();
+      unsigned int ntodo = firstStep->getInfo().ntime();
       DPLOG_INFO_STR ("Processing " << ntodo << " time slots ...");
       {
         ProgressMeter* progress = 0;
@@ -255,8 +257,8 @@ namespace DP3 {
         // Those parameters were always called msin and msout.
         // However, SAS/MAC cannot handle a parameter and a group with the same
         // name, hence one can also use msin.name and msout.name.
-        vector<string> inNames = parset.getStringVector ("msin.name",
-                                                         vector<string>());
+        std::vector<string> inNames = parset.getStringVector ("msin.name",
+                                                         std::vector<string>());
         if (inNames.empty()) {
           inNames = parset.getStringVector ("msin");
         }
@@ -266,7 +268,7 @@ namespace DP3 {
         // This is only possible if a single name is given.
         if (inNames.size() == 1) {
           if (inNames[0].find_first_of ("*?{['") != string::npos) {
-            vector<string> names;
+            std::vector<string> names;
             names.reserve (80);
             casacore::Path path(inNames[0]);
             casacore::String dirName(path.dirName());
@@ -301,10 +303,11 @@ namespace DP3 {
       casacore::String currentMSName (pathIn.absoluteName());
 
       // Create the other steps.
-      vector<string> steps = parset.getStringVector (prefix + "steps");
+      std::vector<string> steps = parset.getStringVector (prefix + "steps");
       lastStep = firstStep;
       DPStep::ShPtr step;
-      for (vector<string>::const_iterator iter = steps.begin();
+      bool needsOutputStep = true;
+      for (std::vector<string>::const_iterator iter = steps.begin();
            iter != steps.end(); ++iter) {
         string prefix(*iter + '.');
         // The alphabetic part of the name is the default step type.
@@ -313,6 +316,10 @@ namespace DP3 {
         while (defaulttype.size()>0 && std::isdigit(*defaulttype.rbegin())) {
           defaulttype.resize(defaulttype.size()-1);
         }
+
+        // If no explicit output step is given as last step, one will be added
+        // with the msout. prefix
+        needsOutputStep = true;
 
         string type = parset.getString(prefix+"type", defaulttype);
         boost::algorithm::to_lower(type);
@@ -357,12 +364,14 @@ namespace DP3 {
           step = DPStep::ShPtr(new Upsample (reader, parset, prefix));
         } else if (type == "split" || type == "explode") {
           step = DPStep::ShPtr(new Split (reader, parset, prefix));
+          needsOutputStep = false;
         } else if (type == "ddecal") {
           step = DPStep::ShPtr(new DDECal (reader, parset, prefix));
         } else if (type == "interpolate") {
           step = DPStep::ShPtr(new Interpolate (reader, parset, prefix));
         } else if (type == "out" || type=="output" || type=="msout") {
           step = makeOutputStep(dynamic_cast<MSReader*>(reader), parset, prefix, currentMSName);
+          needsOutputStep = false;
         } else {
           // Maybe the step is defined in a dynamic library.
           step = findStepCtor(type) (reader, parset, prefix);
@@ -377,11 +386,7 @@ namespace DP3 {
         }
       }
       // Add an output step if not explicitly added in steps (unless last step is a 'split' step)
-      if (steps.size()==0 || (
-          steps[steps.size()-1] != "out" &&
-          steps[steps.size()-1] != "output" &&
-          steps[steps.size()-1] != "msout" &&
-          steps[steps.size()-1] != "split")) {
+      if (needsOutputStep) {
         step = makeOutputStep(dynamic_cast<MSReader*>(reader), parset, "msout.", currentMSName);
         lastStep->setNextStep (step);
         lastStep = step;

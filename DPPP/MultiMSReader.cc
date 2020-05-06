@@ -42,6 +42,7 @@
 #include <casacore/casa/Quanta/MVTime.h>
 #include <casacore/casa/Utilities/GenSort.h>
 #include <casacore/casa/OS/Conversion.h>
+
 #include <iostream>
 
 using namespace casacore;
@@ -74,7 +75,7 @@ namespace DP3 {
       DPStep::ShPtr nullStep (new NullStep());
       itsReaders.reserve (msNames.size());
       itsSteps.reserve   (msNames.size());
-      for (uint i=0; i<msNames.size(); ++i) {
+      for (unsigned int i=0; i<msNames.size(); ++i) {
         itsReaders.push_back (new MSReader (msNames[i], parset, prefix,
                                             itsMissingData));
         // itsSteps takes care of deletion of the MSReader object.
@@ -104,7 +105,7 @@ namespace DP3 {
     void MultiMSReader::setReadVisData (bool readVisData)
     {
       itsReadVisData = readVisData;
-      for (uint i=0; i<itsReaders.size(); ++i) {
+      for (unsigned int i=0; i<itsReaders.size(); ++i) {
         if (itsReaders[i]) {
           itsReaders[i]->setReadVisData (readVisData);
         }
@@ -126,9 +127,9 @@ namespace DP3 {
       Vector<double> chanWidths (itsNrChan);
       Vector<double> resolutions(itsNrChan);
       Vector<double> effectiveBW(itsNrChan);
-      uint inx = 0;
-      for (uint i=0; i<itsReaders.size(); ++i) {
-        uint nchan = itsReaders[i]->getInfo().nchan();
+      unsigned int inx = 0;
+      for (unsigned int i=0; i<itsReaders.size(); ++i) {
+        unsigned int nchan = itsReaders[i]->getInfo().nchan();
         objcopy (chanFreqs.data()  + inx,
                  itsReaders[i]->getInfo().chanFreqs().data(),  nchan);
         objcopy (chanWidths.data() + inx,
@@ -172,10 +173,10 @@ namespace DP3 {
       // Collect the channel info of all MSs.
       Vector<double> chanFreqs (itsNrChan);
       Vector<double> chanWidths(itsNrChan);
-      uint inx = 0;
+      unsigned int inx = 0;
       // Data for a missing MS can only be inserted if all other MSs have
       // the same nr of channels and are in increasing order of freq.
-      for (uint i=0; i<itsReaders.size(); ++i) {
+      for (unsigned int i=0; i<itsReaders.size(); ++i) {
         if (itsReaders[i]) {
           if (itsReaders[i]->getInfo().nchan() != itsFillNChan)
             throw Exception("An MS is missing; the others should have equal nchan");
@@ -192,7 +193,7 @@ namespace DP3 {
           inx += itsFillNChan;
         } else {
           // Insert channel info for missing MSs.
-          for (uint j=0; j<itsFillNChan; ++j) {
+          for (unsigned int j=0; j<itsFillNChan; ++j) {
             chanFreqs[inx]  = freq;
             chanWidths[inx] = chanw;
             freq += chanw;
@@ -226,7 +227,7 @@ namespace DP3 {
       // Loop through all readers and get data and flags.
       IPosition s(3, 0, 0, 0);
       IPosition e(3, itsNrCorr-1, 0, itsNrBl-1);
-      for (uint i=0; i<itsReaders.size(); ++i) {
+      for (unsigned int i=0; i<itsReaders.size(); ++i) {
         if (itsReaders[i]) {
           if (int(i) != itsFirst) {
             itsReaders[i]->process (buf);
@@ -257,7 +258,7 @@ namespace DP3 {
 
     void MultiMSReader::finish()
     {
-      for (uint i=0; i<itsReaders.size(); ++i) {
+      for (unsigned int i=0; i<itsReaders.size(); ++i) {
         if (itsReaders[i]) {
           itsReaders[i]->finish();
         }
@@ -267,7 +268,7 @@ namespace DP3 {
 
     void MultiMSReader::updateInfo (const DPInfo& infoIn)
     {
-      for (uint i=0; i<itsReaders.size(); ++i) {
+      for (unsigned int i=0; i<itsReaders.size(); ++i) {
         if (itsReaders[i]) {
           itsReaders[i]->updateInfo (infoIn);
         }
@@ -291,21 +292,38 @@ namespace DP3 {
       itsFullResNTimeAvg = itsReaders[itsFirst]->ntimeAvgFullRes();
       itsHasFullResFlags = itsReaders[itsFirst]->hasFullResFlags();
       itsBaseRowNrs      = itsReaders[itsFirst]->getBaseRowNrs();
-      for (uint i=0; i<itsMSNames.size(); ++i) {
+      for (unsigned int i=0; i<itsMSNames.size(); ++i) {
         if (itsReaders[i]) {
           const DPInfo& rdinfo = itsReaders[i]->getInfo();
-          if (!(near(itsStartTime, rdinfo.startTime())  &&
-                     near(itsLastTime, itsReaders[i]->lastTime())  &&
-                     near(itsTimeInterval, rdinfo.timeInterval())  &&
-                     itsNrCorr == rdinfo.ncorr()  &&
-                     itsNrBl   == rdinfo.nbaselines()  &&
-                     itsFullResNChanAvg == itsReaders[i]->nchanAvgFullRes()  &&
-                     itsFullResNTimeAvg == itsReaders[i]->ntimeAvgFullRes()  &&
-                     getInfo().antennaSet() == rdinfo.antennaSet()  &&
-                     allEQ (getInfo().getAnt1(), rdinfo.getAnt1())  &&
-                     allEQ (getInfo().getAnt2(), rdinfo.getAnt2())))
-            throw Exception(
-                     "Meta data of MS " + itsMSNames[i]
+          if (!near(itsStartTime, rdinfo.startTime()))
+            throw Exception("Start time of MS " + itsMSNames[i]
+              + " differs from " + itsMSNames[itsFirst]);
+          if (!near(itsLastTime, itsReaders[i]->lastTime()))
+            throw Exception("Last time of MS " + itsMSNames[i]
+                     + " differs from " + itsMSNames[itsFirst]);
+          if (!near(itsTimeInterval, rdinfo.timeInterval()))
+            throw Exception("Time interval of MS " + itsMSNames[i]
+                     + " differs from " + itsMSNames[itsFirst]);
+          if (itsNrCorr != rdinfo.ncorr())
+            throw Exception("Number of correlations of MS " + itsMSNames[i]
+                     + " differs from " + itsMSNames[itsFirst]);
+          if (itsNrBl != rdinfo.nbaselines())
+            throw Exception("Number of baselines of MS " + itsMSNames[i]
+                     + " differs from " + itsMSNames[itsFirst]);
+          if (itsFullResNChanAvg != itsReaders[i]->nchanAvgFullRes())
+            throw Exception("FullResNChanAvg of MS " + itsMSNames[i]
+                     + " differs from " + itsMSNames[itsFirst]);
+          if (itsFullResNTimeAvg != itsReaders[i]->ntimeAvgFullRes())
+            throw Exception("FullResNTimeAvg of MS " + itsMSNames[i]
+                     + " differs from " + itsMSNames[itsFirst]);
+          if (getInfo().antennaSet() != rdinfo.antennaSet())
+            throw Exception("Antenna set of MS " + itsMSNames[i]
+                     + " differs from " + itsMSNames[itsFirst]);
+          if (!allEQ (getInfo().getAnt1(), rdinfo.getAnt1()))
+            throw Exception("Baseline order (ant1) of MS " + itsMSNames[i]
+                     + " differs from " + itsMSNames[itsFirst]);
+          if (!allEQ (getInfo().getAnt2(), rdinfo.getAnt2()))
+            throw Exception("Baseline order (ant2) of MS " + itsMSNames[i]
                      + " differs from " + itsMSNames[itsFirst]);
           itsNrChan += rdinfo.nchan();
           itsHasFullResFlags = (itsHasFullResFlags  &&
@@ -341,7 +359,7 @@ namespace DP3 {
     {
       os << "MultiMSReader" << std::endl;
       os << "  input MSs:      " << itsMSNames[0] << std::endl;
-      for (uint i=1; i<itsMSNames.size(); ++i) {
+      for (unsigned int i=1; i<itsMSNames.size(); ++i) {
         os << "                  " << itsMSNames[i] << std::endl;
       }
       if (! itsSelBL.empty()) {
@@ -362,7 +380,7 @@ namespace DP3 {
       os << "  ntimes:         " << itsMS.nrow() / itsNrBl << std::endl;
       os << "  time interval:  " << itsTimeInterval << std::endl;
       os << "  DATA column:    " << itsDataColName << std::endl;
-      for (uint i=0; i<itsReaders.size(); ++i) {
+      for (unsigned int i=0; i<itsReaders.size(); ++i) {
         if (itsReaders[i]) {
           if (itsReaders[i]->missingData()) {
             os << "      column missing in  " << itsMSNames[i] << std::endl;
@@ -377,7 +395,7 @@ namespace DP3 {
 
     void MultiMSReader::showCounts (std::ostream& os) const
     {
-      for (uint i=0; i<itsReaders.size(); ++i) {
+      for (unsigned int i=0; i<itsReaders.size(); ++i) {
         if (itsReaders[i]) {
           itsReaders[i]->showCounts (os);
         }
@@ -386,7 +404,7 @@ namespace DP3 {
 
     void MultiMSReader::showTimings (std::ostream& os, double duration) const
     {
-      for (uint i=0; i<itsReaders.size(); ++i) {
+      for (unsigned int i=0; i<itsReaders.size(); ++i) {
         if (itsReaders[i]) {
           itsReaders[i]->showTimings (os, duration);
         }
@@ -409,9 +427,9 @@ namespace DP3 {
       }
       IPosition s(3, 0, 0, 0);
       IPosition e(3, itsNrCorr-1, 0, itsNrBl-1);
-      for (uint i=0; i<itsReaders.size(); ++i) {
+      for (unsigned int i=0; i<itsReaders.size(); ++i) {
         if (itsReaders[i]) {
-          uint nchan = itsReaders[i]->getInfo().nchan();
+          unsigned int nchan = itsReaders[i]->getInfo().nchan();
           e[1] = s[1] + nchan-1;
           itsReaders[i]->getWeights (rowNrs, itsBuffers[i]);
           weights(s,e) = itsBuffers[i].getWeights();
@@ -445,7 +463,7 @@ namespace DP3 {
       // Get the flags from all MSs and combine them.
       IPosition s(3, 0);
       IPosition e(flags.shape() - 1);
-      for (uint i=0; i<itsReaders.size(); ++i) {
+      for (unsigned int i=0; i<itsReaders.size(); ++i) {
         if (itsReaders[i]) {
           itsReaders[i]->getFullResFlags (rowNrs, itsBuffers[i]);
           e[0] = s[0] + itsBuffers[i].getFullResFlags().shape()[0] - 1;

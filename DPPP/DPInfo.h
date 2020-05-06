@@ -33,11 +33,20 @@
 #include <casacore/casa/Arrays/Vector.h>
 #include <casacore/casa/Containers/Record.h>
 
+#include "../Common/ThreadPool.h"
+
 namespace DP3 {
   namespace DPPP {
 
     //# Forward declarations.
     class DPInput;
+    
+    enum BeamCorrectionMode {
+      NoBeamCorrection = 0,
+      FullBeamCorrection = 1,
+      ArrayFactorBeamCorrection = 2,
+      ElementBeamCorrection = 3
+    };
 
     // @ingroup NDPPP
 
@@ -54,12 +63,12 @@ namespace DP3 {
       DPInfo();
 
       // Set the initial info from the input.
-      void init (uint ncorr, uint startChan, uint nchan,
-                 uint ntime, double startTime, double timeInterval,
+      void init (unsigned int ncorr, unsigned int startChan, unsigned int nchan,
+                 unsigned int ntime, double startTime, double timeInterval,
                  const string& msName, const string& antennaSet);
 
       // Set nr of channels.
-      void setNChan (uint nchan)
+      void setNChan (unsigned int nchan)
         { itsNChan = nchan; }
 
       // Set time interval
@@ -86,7 +95,7 @@ namespace DP3 {
       // Set the info for the given antennae and baselines.
       void set (const casacore::Vector<casacore::String>& antNames,
                 const casacore::Vector<casacore::Double>& antDiam,
-                const vector<casacore::MPosition>& antPos,
+                const std::vector<casacore::MPosition>& antPos,
                 const casacore::Vector<casacore::Int>& ant1,
                 const casacore::Vector<casacore::Int>& ant2);
 
@@ -104,12 +113,12 @@ namespace DP3 {
       // If chanAvg is higher than the actual nr of channels, it is reset.
       // The same is true for timeAvg.
       // It returns the possibly reset nr of channels to average.
-      uint update (uint chanAvg, uint timeAvg);
+      unsigned int update (unsigned int chanAvg, unsigned int timeAvg);
 
       // Update the info from the given selection parameters.
       // Optionally unused stations are really removed from the antenna lists.
-      void update (uint startChan, uint nchan,
-                   const vector<uint>& baselines, bool remove);
+      void update (unsigned int startChan, unsigned int nchan,
+                   const std::vector<unsigned int>& baselines, bool remove);
 
       // Remove unused stations from the antenna lists.
       void removeUnusedAnt();
@@ -125,23 +134,23 @@ namespace DP3 {
         { return itsMSName; }
       const string& antennaSet() const
         { return itsAntennaSet; }
-      uint ncorr() const
+      unsigned int ncorr() const
         { return itsNCorr; }
-      uint nchan() const
+      unsigned int nchan() const
         { return itsNChan; }
-      uint startchan() const
+      unsigned int startchan() const
         { return itsStartChan; }
-      uint origNChan() const
+      unsigned int origNChan() const
         { return itsOrigNChan; }
-      uint nchanAvg() const
+      unsigned int nchanAvg() const
         { return itsChanAvg; }
-      uint nantenna() const
+      unsigned int nantenna() const
         { return itsAntNames.size(); }
-      uint nbaselines() const
+      unsigned int nbaselines() const
         { return itsAnt1.size(); }
-      uint ntime() const
+      unsigned int ntime() const
         { return itsNTime; }
-      uint ntimeAvg() const
+      unsigned int ntimeAvg() const
         { return itsTimeAvg; }
       double startTime() const
         { return itsStartTime; }
@@ -155,7 +164,7 @@ namespace DP3 {
         { return itsAntNames; }
       const casacore::Vector<casacore::Double>& antennaDiam() const
         { return itsAntDiam; }
-      const vector<casacore::MPosition>& antennaPos() const
+      const std::vector<casacore::MPosition>& antennaPos() const
         { return itsAntPos; }
       const casacore::MPosition& arrayPos() const
         { return itsArrayPos; }
@@ -194,13 +203,13 @@ namespace DP3 {
 
       // Get the antenna numbers actually used in the (selected) baselines.
       // E.g. [0,2,5,6]
-      const vector<int>& antennaUsed() const
+      const std::vector<int>& antennaUsed() const
         { return itsAntUsed; }
 
       // Get the indices of all antennae in the used antenna vector above.
       // -1 means that the antenna is not used.
       // E.g. [0,-1,1,-1,-1,2,3] for the example above.
-      const vector<int>& antennaMap() const
+      const std::vector<int>& antennaMap() const
         { return itsAntMap; }
 
       // Are the visibility data needed?
@@ -240,10 +249,16 @@ namespace DP3 {
 
       // Get the baseline table index of the autocorrelations.
       // A negative value means there are no autocorrelations for that antenna.
-      const vector<int>& getAutoCorrIndex() const;
+      const std::vector<int>& getAutoCorrIndex() const;
 
       // Get the lengths of the baselines (in meters).
-      const vector<double>& getBaselineLengths() const;
+      const std::vector<double>& getBaselineLengths() const;
+      
+      void setNThreads(unsigned int nThreads)
+      { itsNThreads = nThreads; }
+      
+      unsigned int nThreads() const
+        { return itsNThreads; }
 
       // Convert to a Record.
       // The names of the fields in the record are the data names without 'its'.
@@ -252,6 +267,16 @@ namespace DP3 {
       // Update the DPInfo object from a Record.
       // It is possible that only a few fields are defined in the record.
       void fromRecord (const casacore::Record& rec);
+      
+      enum BeamCorrectionMode beamCorrectionMode() const
+      { return itsBeamCorrectionMode; };
+      void setBeamCorrectionMode(enum BeamCorrectionMode mode)
+      { itsBeamCorrectionMode = mode; }
+      
+      const casacore::MDirection& beamCorrectionDir() const
+      { return itsBeamCorrectionDir; }
+      void setBeamCorrectionDir(const casacore::MDirection& dir)
+      { itsBeamCorrectionDir = dir; }
 
     private:
       // Set which antennae are actually used.
@@ -270,19 +295,21 @@ namespace DP3 {
       std::string itsDataColName;
       std::string itsWeightColName;
       string itsAntennaSet;
-      uint   itsNCorr;
-      uint   itsStartChan;
-      uint   itsOrigNChan;
-      uint   itsNChan;
-      uint   itsChanAvg;
-      uint   itsNTime;
-      uint   itsTimeAvg;
+      unsigned int   itsNCorr;
+      unsigned int   itsStartChan;
+      unsigned int   itsOrigNChan;
+      unsigned int   itsNChan;
+      unsigned int   itsChanAvg;
+      unsigned int   itsNTime;
+      unsigned int   itsTimeAvg;
       double itsStartTime;
       double itsTimeInterval;
       casacore::MDirection itsPhaseCenter;
       bool             itsPhaseCenterIsOriginal;
       casacore::MDirection itsDelayCenter;
       casacore::MDirection itsTileBeamDir;
+      enum BeamCorrectionMode itsBeamCorrectionMode;
+      casacore::MDirection itsBeamCorrectionDir;
       casacore::MPosition  itsArrayPos;
       casacore::Vector<double>       itsChanFreqs;
       casacore::Vector<double>       itsChanWidths;
@@ -292,13 +319,14 @@ namespace DP3 {
       double                     itsRefFreq;
       casacore::Vector<casacore::String> itsAntNames;
       casacore::Vector<casacore::Double> itsAntDiam;
-      vector<casacore::MPosition>    itsAntPos;
-      vector<int>                itsAntUsed;
-      vector<int>                itsAntMap;
+      std::vector<casacore::MPosition>    itsAntPos;
+      std::vector<int>                itsAntUsed;
+      std::vector<int>                itsAntMap;
       casacore::Vector<casacore::Int>    itsAnt1;          //# ant1 of all baselines
       casacore::Vector<casacore::Int>    itsAnt2;          //# ant2 of all baselines
-      mutable vector<double>     itsBLength;       //# baseline lengths
-      mutable vector<int>        itsAutoCorrIndex; //# autocorr index per ant
+      mutable std::vector<double>     itsBLength;       //# baseline lengths
+      mutable std::vector<int>        itsAutoCorrIndex; //# autocorr index per ant
+      unsigned int itsNThreads;
     };
 
   } //# end namespace
