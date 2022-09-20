@@ -1,0 +1,34 @@
+image: ubuntu:20.04
+
+before_script:
+ - apt-get update -qq
+ - export DEBIAN_FRONTEND=noninteractive && apt-get install -y -qq
+    casacore-data casacore-dev
+    cmake
+    g++
+    git
+    libboost-test-dev
+    libcfitsio-dev
+    pkg-config
+    python3-pip
+    clang-format-12
+ - pip3 install gcovr cmake-format
+
+format:
+  script:
+    # run-format.sh uses 'clang-format', not 'clang-format-12'.
+    - ln -sf clang-format-12 /usr/bin/clang-format
+    - ./scripts/run-format.sh
+
+aocommon:
+  script:
+    - mkdir build
+    - cd build
+    - cmake -DCMAKE_CXX_FLAGS="-coverage" -DCMAKE_EXE_LINKER_FLAGS="-coverage" ../
+    - make
+    # gcovr to create badge
+    # This also writes the xml file to enable line coverage highlighting in MRs
+    - make coverage
+  artifacts:
+    reports:
+      cobertura: build/coverage.xml

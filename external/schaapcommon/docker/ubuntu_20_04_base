@@ -1,0 +1,16 @@
+# Copyright (C) 2021 ASTRON (Netherlands Institute for Radio Astronomy)
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# base
+FROM ubuntu:20.04
+RUN export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get upgrade -y && \
+# install astronomy packages
+    apt-get -y install libcfitsio-dev wcslib-dev \
+# install misc packages
+    wget git make cmake g++ doxygen \
+# install dependencies
+    libboost-all-dev libhdf5-dev libpython3-dev python3-pip \
+    casacore-dev casacore-tools clang-format-12 \
+# The formatter needs a binary named 'clang-format', not 'clang-format-12'
+    && ln -sf clang-format-12 /usr/bin/clang-format \
+    && python3 -m pip install gcovr cmake-format

@@ -1,0 +1,73 @@
+# Copyright (C) 2020 ASTRON (Netherlands Institute for Radio Astronomy)
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+stages:
+ - prepare
+ - build
+ - test
+
+.build:
+  stage: build
+  image: schaapcommon_${UBUNTU_VERSION}:${CI_COMMIT_SHORT_SHA}
+  before_script:
+    - git clone https://gitlab.com/aroffringa/aocommon.git
+  script:
+    - cmake --version
+    - mkdir build && cd build
+    - cmake -DAOCOMMON_INCLUDE_DIR=../aocommon/include -DBUILD_TESTING=ON -DCMAKE_INSTALL_PREFIX=.. -DCMAKE_CXX_FLAGS="-coverage" -DCMAKE_EXE_LINKER_FLAGS="-coverage" ..
+    - make -j4
+    - make install
+  artifacts:
+    paths:
+      - aocommon
+      - build
+
+.test:
+  stage: test
+  image: schaapcommon_${UBUNTU_VERSION}:${CI_COMMIT_SHORT_SHA}
+  script:
+     - cd build/
+     - ctest -j4 -T test
+
+build-base-1804:
+  stage: prepare
+  script:
+    - docker build --tag schaapcommon_1804:${CI_COMMIT_SHORT_SHA} -f ./docker/ubuntu_18_04_base .
+
+build-base-2004:
+  stage: prepare
+  script:
+    - docker build --tag schaapcommon_2004:${CI_COMMIT_SHORT_SHA} -f ./docker/ubuntu_20_04_base .
+
+format:
+  stage: build
+  needs: [build-base-2004]
+  image: schaapcommon_2004:${CI_COMMIT_SHORT_SHA}
+  script:
+    - ./scripts/run-format.sh
+
+build-1804:
+  variables:
+    UBUNTU_VERSION: '1804'
+  needs: [build-base-1804]
+  extends: .build
+
+build-2004:
+  variables:
+    UBUNTU_VERSION: '2004'
+  needs: [build-base-2004]
+  extends: .build
+
+test-1804:
+  variables:
+    UBUNTU_VERSION: '1804'
+  needs: [build-1804]
+  extends: .test
+
+test-2004:
+  variables:
+    UBUNTU_VERSION: '2004'
+  needs: [build-2004]
+  extends: .test
+  after_script:
+    - gcovr -r .. -e '.*/external/.*' -e '.*/CompilerIdCXX/.*' -e '.*/test/.*'

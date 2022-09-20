@@ -1,12 +1,12 @@
 # DP3
 LOFAR preprocessing software, including averaging, flagging, various kinds of calibration and more.
 
-The DPPP documentation can be found at: https://www.astron.nl/lofarwiki/doku.php?id=public:user_software:documentation:ndppp
+The DP3 documentation can be found at: https://www.astron.nl/citt/DP3
 
-This repository is a continuation of the one at svn.astron.nl/LOFAR. In particular, it has branched off at LOFAR Release 3.2 (Sept 2018). DP3 will likely not be maintained in the ASTRON repository.
+This repository is a continuation of the one at svn.astron.nl/LOFAR. In particular, it has branched off at LOFAR Release 3.2 (Sept 2018). The version of DP3 that is in the ASTRON repository is no longer maintained.
 
 ## Installation
-Some non-standard dependencies of this project are: armadillo, boost, boost-python, casacore, hdf5, aoflagger, and the LOFAR beam model libstationresponse. These can be installed using KERN, see the file .travis/Dockerfile in this repository for an example installation.
+Some non-standard dependencies of this project are: armadillo, boost, boost-python, casacore, hdf5, aoflagger, and EveryBeam. See the Dockerfiles [`docker/ubuntu_20_04_base`](docker/ubuntu_20_04_base) and [`docker/ubuntu_20_04_dppp`](docker/ubuntu_20_04_dppp) as examples.
 
 Typical installation commands:
 ```
@@ -16,6 +16,10 @@ cmake ..
 make -j4
 make install
 ```
+## Contributing
 
-[![Build Status](https://travis-ci.org/lofar-astron/DP3.svg?branch=master)](https://travis-ci.org/lofar-astron/DP3)
-[![ASCL](https://img.shields.io/badge/ascl-1804.003-blue.svg?colorB=262255)](http://ascl.net/1804.003)
+### Want to Help?
+
+Issues can be filed either at [gitlab](https://git.astron.nl/RD/DP3) or [github](https://github.com/lofar-astron/DP3).
+
+Want to contribute some code, or improve documentation? You can start by cloning our code from the [DP3 development repository](https://git.astron.nl/RD/DP3).
