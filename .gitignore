@@ -1,6 +1,8 @@
 .kdev4/
 DP3.kdev4
 build/
+builds/
+__pycache__/
 cmakestrap.sh
 *~
 .vscode

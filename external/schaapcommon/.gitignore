@@ -1,0 +1,6 @@
+.vscode/
+build/
+builds/
+*~
+.kdev4/
+schaapcommon.kdev4

@@ -1,0 +1,300 @@
+# Copyright (C) 2020 ASTRON (Netherlands Institute for Radio Astronomy)
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+workflow:
+  rules:
+    # don't create a pipeline if its a commit pipeline, on a branch and that branch has open merge requests.
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - when: always
+
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+
+.failable:
+  retry:
+    max: 1
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+
+.astron_repo: &if_astron_repo
+  if: '$CI_SERVER_HOST == "git.astron.nl"'
+.not_astron_repo: &if_not_astron_repo
+  if: '$CI_SERVER_HOST != "git.astron.nl"'
+
+stages:
+  - prepare
+  - build
+  - linting
+  - test
+  - publish
+  - pages
+
+# Build the base image for git.astron
+build-base:
+  stage: prepare
+  extends: .failable
+  image: docker:stable
+  script:
+  - docker build --tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA -f ./docker/ubuntu_20_04_base .
+  rules:
+    # Always run this job. Note that a duplicate pipeline is triggered when pushing commits to
+    # a branch that has an open MR, see https://gitlab.com/gitlab-org/gitlab/-/issues/201845
+    - <<: *if_astron_repo
+
+# On the SKA repo - which does not have a docker cache - we need to push it to the gitlab registry which requires docker:dind
+build-base-ska:
+  stage: prepare
+  image: docker:stable
+  services:
+  - docker:dind
+  script:
+  - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  - docker build --tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA -f ./docker/ubuntu_20_04_base .
+  - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+  rules:
+    - <<: *if_not_astron_repo
+
+build-ubuntu18:
+  stage: build
+  extends: .failable
+  needs: []
+  script:
+  - docker build -f ./docker/ubuntu_18_04 .
+  rules:
+    - <<: *if_astron_repo
+
+build-no-idg:
+  stage: build
+  extends: .failable
+  image: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+  before_script:
+    - rm -r /usr/lib/cmake/*idg*
+    - rm -r /usr/lib/cmake/*IDGAPITargets*
+    - rm -r /usr/lib/*idg*
+  script:
+    - mkdir build
+    - cd build
+    - cmake -G Ninja ..
+    - ninja
+  rules:
+    - <<: *if_astron_repo
+
+# Build debug has no needs entry because it can have either a base
+# image from build-base or build-base-ska which is determined on runtime
+build-debug:
+  stage: build
+  extends: .failable
+  image: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+  before_script:
+    - pip3 install pytest
+  script:
+    - mkdir build && cd build
+    - cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=On -DCMAKE_CXX_FLAGS="-coverage" -DCMAKE_EXE_LINKER_FLAGS="-coverage" ..
+    - ninja
+    - ninja install
+  artifacts:
+    paths:
+      - build
+
+build-release:
+  stage: build
+  extends: .failable
+  image: docker:stable
+  needs: ["build-base"]
+  script:
+    - docker build --build-arg BASE_TAG=$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA --tag dppp_lofar:${CI_COMMIT_SHORT_SHA} -f ./docker/ubuntu_20_04_dppp .
+  rules:
+    - <<: *if_not_astron_repo
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "master"'
+
+# On the SKA repo - which does not have a docker cache - we need to push it to the gitlab registry which requires docker:dind
+build-release-ska:
+  stage: build
+  image: docker:stable
+  services:
+    - docker:dind
+  needs: ["build-base-ska"]
+  script:
+    - docker build --build-arg BASE_TAG=$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA --tag dppp_lofar:${CI_COMMIT_SHORT_SHA} -f ./docker/ubuntu_20_04_dppp .
+  rules:
+    - <<: *if_not_astron_repo
+
+build-doc:
+  stage: build
+  extends: .failable
+  image: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+  needs: ["build-base"]
+  before_script:
+    - patch -p0 /usr/local/lib/python3.8/dist-packages/jsonschema2rst/parser.py < docs/parser.py.patch
+  script:
+    - mkdir build && cd build
+    - cmake -G Ninja ../docs
+    - ninja doc userdoc
+  artifacts: # Only for master the docs are published; for branches it may be useful to browse the artifacts
+    paths:
+    - build/docs
+  rules:
+    - <<: *if_astron_repo
+
+build-package:
+  stage: build
+  image: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+  script:
+    - mkdir dp3_package
+    - mkdir build && cd build
+    - git fetch --unshallow # We need to unshallow for the tags (setting GIT_DEPTH is not good enough)
+    - cmake -DBUILD_PACKAGES=On ..
+    - make -j4
+    - make package
+    - mv $(ls -1 *.deb) ../dp3_package/
+  artifacts:
+    paths:
+    - dp3_package/
+  rules:
+    # The package is built only during a merge_request_event, a merge to master,
+    # or when the pipeline is triggered by a tag event.
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "master"'
+    - if: '$CI_COMMIT_TAG'
+    - if: '$UPLOAD_PACKAGE'
+
+linting:
+  stage: linting
+  extends: .failable
+  needs: ["build-base"]
+  image: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+  script:
+    - ./scripts/run-format.sh
+
+unit-test:
+  stage: test
+  extends: .failable
+  needs: ["build-debug"]
+  image: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+  script:
+    - cd build
+    - ninja # Needed when ran on different containers with different timestamps
+    - ctest --output-on-failure -j$(($(nproc)/2 > 0 ? $(nproc)/2:1)) -L unit |& tee ctest.out
+    # Check if ctest found any tests. ctest >= 3.18 has a --no-tests=error
+    # option. Older versions require a manual check.
+    - if grep -q 'No tests were found' ctest.out; then exit 1; fi
+    - mkdir coverage-unit
+    # The line below will show the coverage in the logs which are used in the gitlab coverage. Common is included in this coverage report.
+    - gcovr -j$(($(nproc)/2 > 0 ? $(nproc)/2:1)) -r ../ -e '.*/external/.*' -e '.*/test/.*' -e '.*/CompilerIdCXX/.*' --json run-unit.json --xml coverage.xml --html-details coverage-unit/coverage.html
+    - gcovr --add-tracefile run-unit.json
+    - tar cfz coverage-unit.tar.gz coverage-unit/
+  artifacts:
+    paths:
+      # This will give a warning which is ok
+      - build/run-unit.json
+      - build/unittest*.xml
+      - build/coverage-unit.tar.gz
+    reports:
+      junit: build/unittest*.xml
+      cobertura: build/coverage.xml
+
+integration-test:
+  stage: test
+  extends: .failable
+  needs: ["build-debug"]
+  image: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+  script:
+    - cd build
+    - ninja # Needed when ran on different containers with different timestamps
+    - ctest --output-on-failure -j$(($(nproc)/2 > 0 ? $(nproc)/2:1)) -L integration |& tee ctest.out
+    # Check if ctest found any tests. ctest >= 3.18 has a --no-tests=error
+    # option. Older versions require a manual check.
+    - if grep -q 'No tests were found' ctest.out; then exit 1; fi
+    # The json only needs to be built on the SKA repository
+    - if [[ $CI_SERVER_HOST != "git.astron.nl" ]] ; then gcovr -j$(($(nproc)/2 > 0 ? $(nproc)/2:1)) -r ../ -e '.*/external/.*' -e '.*/test/.*' -e '.*/CompilerIdCXX/.*' -e '.*/Common/.*' --json -o run-integration.json; fi
+  artifacts:
+    paths:
+      # This will give a warning and ERROR: No files to upload, which is ok
+      - build/run-integration.json
+      - build/integration_*.xml
+    reports:
+      junit: build/integration_*.xml
+
+check-stack:
+  variables:
+    # Pass commit hash to downstream pipeline
+    DP3_TRIGGER_HASH: $CI_COMMIT_SHA
+  stage: test
+  needs: []
+  trigger:
+    project: RD/schaap-stack
+    branch: master
+    # This will mirror the status of the downstream pipeline
+    strategy: depend
+  rules:
+    - <<: *if_not_astron_repo
+      when: never
+    # Only add job for a merge request event on git.astron.nl
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+publish-doc:
+  stage: publish
+  image: docker:stable
+  needs: ["build-doc"]
+  before_script:
+    - 'which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y )'
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | base64 -d | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - ssh-keyscan -H dop810 > ~/.ssh/known_hosts
+  script:
+    - scp -r build/docs/* citt@dop810:DP3/
+  rules:
+    - <<: *if_not_astron_repo
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "master"'
+
+deploy-package:
+  stage: publish
+  needs: ["build-package"]
+  image: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+  script:
+    - pip3 install aptly-api-client
+    - chmod -R 700 external/schaap-packaging
+    - cd dp3_package
+    - export FILES=$(ls -1 $PWD/*.deb)
+    - echo UPLOADING files $FILES
+    # The following example command must be executed first or else the update will fail because there is no repository
+    # create_repo.py -a amd64 -c testing -d bionic --gpg-key ${GPG_KEY} --gpg-passphrase ${GPG_PASS} schaap
+    - ../external/schaap-packaging/update_repo.py --cleanup -d bionic --gpg-key ${GPG_KEY} --gpg-passphrase ${GPG_PASS} schaap ${FILES}
+  rules:
+    # Only run on master because GPG_KEY and GPG_PASS are protected and therefore only available on protected branches.
+    - if: '$CI_COMMIT_BRANCH != "master"'
+      when: never
+    - if: '$UPLOAD_PACKAGE'
+
+pages:
+  stage: pages
+  image: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+  needs: ["build-debug", "unit-test", "integration-test"]
+  before_script:
+    - apt-get update
+    - apt-get -y install curl
+  script:
+    - mkdir -p .public/build/reports
+    - cd .public
+    - gcovr -j$(($(nproc)/2 > 0 ? $(nproc)/2:1)) -r ../ -a ../build/run-integration.json -a ../build/run-unit.json --xml -o build/reports/code-coverage.xml
+    - gcovr -j$(($(nproc)/2 > 0 ? $(nproc)/2:1)) -r ../ -a ../build/run-integration.json -a ../build/run-unit.json --html --html-details -o index.html
+    - cp ../build/unittests.xml build/reports/unit-tests.xml
+    # Create and upload GitLab badges
+    - chmod -R 700 ../ci
+    - python3 ../ci/.produce-ci-metrics.py build/reports > ci-metrics.json
+    - sh ../ci/ci-badges-func.sh
+    - cd ..
+    - mv .public public
+  artifacts:
+    paths:
+      - public
+    reports:
+      cobertura: public/build/reports/code-coverage.xml
+  rules:
+    - <<: *if_not_astron_repo
