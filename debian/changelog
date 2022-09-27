@@ -1,3 +1,10 @@
+dp3 (5.2-1kern1) focal; urgency=medium
+
+  [ Athanaseus Javas Ramaila ]
+  * New upstream version 5.2
+
+ -- KERN packaging <packaging@kernsuite.info>  Sun, 18 Sep 2022 09:30:50 +0000
+
 dp3 (4.1-1) bionic; urgency=medium
 
   [ Gijs Molenaar ]

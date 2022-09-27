@@ -1,0 +1,650 @@
+Description: <short summary of the patch>
+ TODO: Put a short summary on the line above and replace this paragraph
+ with a longer explanation of this change. Complete the meta-information
+ with other relevant fields (see below for details). To make it easier, the
+ information below has been extracted from the changelog. Adjust it or drop
+ it.
+ .
+ dp3 (5.2-1kern1) focal; urgency=medium
+ .
+   [ Athanaseus Javas Ramaila ]
+   * New upstream version 5.2
+Author: KERN packaging <packaging@kernsuite.info>
+
+---
+The information above should follow the Patch Tagging Guidelines, please
+checkout http://dep.debian.net/deps/dep3/ to learn about the format. Here
+are templates for supplementary fields that you might want to add:
+
+Origin: <vendor|upstream|other>, <url of original patch>
+Bug: <url in upstream bugtracker>
+Bug-Debian: https://bugs.debian.org/<bugnumber>
+Bug-Ubuntu: https://launchpad.net/bugs/<bugnumber>
+Forwarded: <no|not-needed|url proving that it has been forwarded>
+Reviewed-By: <name and email of someone who approved the patch>
+Last-Update: 2022-09-22
+
+--- dp3-5.2.orig/base/share/LOFAR-HBA-default.rfis
++++ dp3-5.2/base/share/LOFAR-HBA-default.rfis
+@@ -1,90 +1,90 @@
+-<?xml version="1.0" encoding="UTF-8"?>
+-<!-- This is a strategy configuration file for the AOFlagger RFI
+-detector by André Offringa (offringa@gmail.com).
+-Created by AOFlagger 2.7.2 (2015-09-27)
+--->
+-<rfi-strategy format-version="3.7" reader-version-required="3.4">
+-  <action type="Strategy">
+-    <children>
+-      <action type="SetFlaggingAction">
+-        <new-flagging>0</new-flagging>
+-      </action>
+-      <action type="ForEachPolarisationBlock">
+-        <on-xx>0</on-xx>
+-        <on-xy>1</on-xy>
+-        <on-yx>1</on-yx>
+-        <on-yy>0</on-yy>
+-        <on-stokes-i>0</on-stokes-i>
+-        <on-stokes-q>0</on-stokes-q>
+-        <on-stokes-u>0</on-stokes-u>
+-        <on-stokes-v>0</on-stokes-v>
+-        <children>
+-          <action type="ForEachComplexComponentAction">
+-            <on-amplitude>1</on-amplitude>
+-            <on-phase>0</on-phase>
+-            <on-real>0</on-real>
+-            <on-imaginary>0</on-imaginary>
+-            <restore-from-amplitude>0</restore-from-amplitude>
+-            <children>
+-              <action type="IterationBlock">
+-                <iteration-count>2</iteration-count>
+-                <sensitivity-start>4</sensitivity-start>
+-                <children>
+-                  <action type="SumThresholdAction">
+-                    <base-sensitivity>1</base-sensitivity>
+-                    <time-direction-flagging>1</time-direction-flagging>
+-                    <frequency-direction-flagging>1</frequency-direction-flagging>
+-                  </action>
+-                  <action type="CombineFlagResults">
+-                    <children>
+-                      <action type="FrequencySelectionAction">
+-                        <threshold>3</threshold>
+-                      </action>
+-                      <action type="TimeSelectionAction">
+-                        <threshold>3.5</threshold>
+-                      </action>
+-                    </children>
+-                  </action>
+-                  <action type="SetImageAction">
+-                    <new-image>1</new-image>
+-                  </action>
+-                  <action type="ChangeResolutionAction">
+-                    <time-decrease-factor>3</time-decrease-factor>
+-                    <frequency-decrease-factor>3</frequency-decrease-factor>
+-                    <restore-revised>1</restore-revised>
+-                    <restore-masks>0</restore-masks>
+-                    <children>
+-                      <action type="HighPassFilterAction">
+-                        <horizontal-kernel-sigma-sq>2.5</horizontal-kernel-sigma-sq>
+-                        <vertical-kernel-sigma-sq>5</vertical-kernel-sigma-sq>
+-                        <window-width>21</window-width>
+-                        <window-height>31</window-height>
+-                        <mode>1</mode>
+-                      </action>
+-                    </children>
+-                  </action>
+-                </children>
+-              </action>
+-              <action type="SumThresholdAction">
+-                <base-sensitivity>1</base-sensitivity>
+-                <time-direction-flagging>1</time-direction-flagging>
+-                <frequency-direction-flagging>1</frequency-direction-flagging>
+-              </action>
+-            </children>
+-          </action>
+-        </children>
+-      </action>
+-      <action type="SetFlaggingAction">
+-        <new-flagging>4</new-flagging>
+-      </action>
+-      <action type="StatisticalFlagAction">
+-        <enlarge-frequency-size>0</enlarge-frequency-size>
+-        <enlarge-time-size>0</enlarge-time-size>
+-        <max-contaminated-frequencies-ratio>0.5</max-contaminated-frequencies-ratio>
+-        <max-contaminated-times-ratio>0.5</max-contaminated-times-ratio>
+-        <minimum-good-frequency-ratio>0.2</minimum-good-frequency-ratio>
+-        <minimum-good-time-ratio>0.2</minimum-good-time-ratio>
+-      </action>
+-    </children>
+-  </action>
++<?xml version="1.0" encoding="UTF-8"?>
++<!-- This is a strategy configuration file for the AOFlagger RFI
++detector by André Offringa (offringa@gmail.com).
++Created by AOFlagger 2.7.2 (2015-09-27)
++-->
++<rfi-strategy format-version="3.7" reader-version-required="3.4">
++  <action type="Strategy">
++    <children>
++      <action type="SetFlaggingAction">
++        <new-flagging>0</new-flagging>
++      </action>
++      <action type="ForEachPolarisationBlock">
++        <on-xx>0</on-xx>
++        <on-xy>1</on-xy>
++        <on-yx>1</on-yx>
++        <on-yy>0</on-yy>
++        <on-stokes-i>0</on-stokes-i>
++        <on-stokes-q>0</on-stokes-q>
++        <on-stokes-u>0</on-stokes-u>
++        <on-stokes-v>0</on-stokes-v>
++        <children>
++          <action type="ForEachComplexComponentAction">
++            <on-amplitude>1</on-amplitude>
++            <on-phase>0</on-phase>
++            <on-real>0</on-real>
++            <on-imaginary>0</on-imaginary>
++            <restore-from-amplitude>0</restore-from-amplitude>
++            <children>
++              <action type="IterationBlock">
++                <iteration-count>2</iteration-count>
++                <sensitivity-start>4</sensitivity-start>
++                <children>
++                  <action type="SumThresholdAction">
++                    <base-sensitivity>1</base-sensitivity>
++                    <time-direction-flagging>1</time-direction-flagging>
++                    <frequency-direction-flagging>1</frequency-direction-flagging>
++                  </action>
++                  <action type="CombineFlagResults">
++                    <children>
++                      <action type="FrequencySelectionAction">
++                        <threshold>3</threshold>
++                      </action>
++                      <action type="TimeSelectionAction">
++                        <threshold>3.5</threshold>
++                      </action>
++                    </children>
++                  </action>
++                  <action type="SetImageAction">
++                    <new-image>1</new-image>
++                  </action>
++                  <action type="ChangeResolutionAction">
++                    <time-decrease-factor>3</time-decrease-factor>
++                    <frequency-decrease-factor>3</frequency-decrease-factor>
++                    <restore-revised>1</restore-revised>
++                    <restore-masks>0</restore-masks>
++                    <children>
++                      <action type="HighPassFilterAction">
++                        <horizontal-kernel-sigma-sq>2.5</horizontal-kernel-sigma-sq>
++                        <vertical-kernel-sigma-sq>5</vertical-kernel-sigma-sq>
++                        <window-width>21</window-width>
++                        <window-height>31</window-height>
++                        <mode>1</mode>
++                      </action>
++                    </children>
++                  </action>
++                </children>
++              </action>
++              <action type="SumThresholdAction">
++                <base-sensitivity>1</base-sensitivity>
++                <time-direction-flagging>1</time-direction-flagging>
++                <frequency-direction-flagging>1</frequency-direction-flagging>
++              </action>
++            </children>
++          </action>
++        </children>
++      </action>
++      <action type="SetFlaggingAction">
++        <new-flagging>4</new-flagging>
++      </action>
++      <action type="StatisticalFlagAction">
++        <enlarge-frequency-size>0</enlarge-frequency-size>
++        <enlarge-time-size>0</enlarge-time-size>
++        <max-contaminated-frequencies-ratio>0.5</max-contaminated-frequencies-ratio>
++        <max-contaminated-times-ratio>0.5</max-contaminated-times-ratio>
++        <minimum-good-frequency-ratio>0.2</minimum-good-frequency-ratio>
++        <minimum-good-time-ratio>0.2</minimum-good-time-ratio>
++      </action>
++    </children>
++  </action>
+ </rfi-strategy>
+\ No newline at end of file
+--- dp3-5.2.orig/base/share/LOFAR-LBA-default.rfis
++++ dp3-5.2/base/share/LOFAR-LBA-default.rfis
+@@ -1,93 +1,93 @@
+-<?xml version="1.0" encoding="UTF-8"?>
+-<!-- This is a strategy configuration file for the AOFlagger RFI
+-detector by André Offringa (offringa@gmail.com).
+-Created by AOFlagger 2.7.2 (2015-09-27)
+--->
+-<rfi-strategy format-version="3.7" reader-version-required="3.4">
+-  <action type="Strategy">
+-    <children>
+-      <action type="SetFlaggingAction">
+-        <new-flagging>0</new-flagging>
+-      </action>
+-      <action type="ForEachPolarisationBlock">
+-        <on-xx>1</on-xx>
+-        <on-xy>1</on-xy>
+-        <on-yx>1</on-yx>
+-        <on-yy>1</on-yy>
+-        <on-stokes-i>0</on-stokes-i>
+-        <on-stokes-q>0</on-stokes-q>
+-        <on-stokes-u>0</on-stokes-u>
+-        <on-stokes-v>0</on-stokes-v>
+-        <children>
+-          <action type="ForEachComplexComponentAction">
+-            <on-amplitude>1</on-amplitude>
+-            <on-phase>0</on-phase>
+-            <on-real>0</on-real>
+-            <on-imaginary>0</on-imaginary>
+-            <restore-from-amplitude>0</restore-from-amplitude>
+-            <children>
+-              <action type="IterationBlock">
+-                <iteration-count>2</iteration-count>
+-                <sensitivity-start>4</sensitivity-start>
+-                <children>
+-                  <action type="SumThresholdAction">
+-                    <base-sensitivity>1</base-sensitivity>
+-                    <time-direction-flagging>1</time-direction-flagging>
+-                    <frequency-direction-flagging>1</frequency-direction-flagging>
+-                  </action>
+-                  <action type="CombineFlagResults">
+-                    <children>
+-                      <action type="FrequencySelectionAction">
+-                        <threshold>3</threshold>
+-                      </action>
+-                      <action type="TimeSelectionAction">
+-                        <threshold>3.5</threshold>
+-                      </action>
+-                    </children>
+-                  </action>
+-                  <action type="SetImageAction">
+-                    <new-image>1</new-image>
+-                  </action>
+-                  <action type="ChangeResolutionAction">
+-                    <time-decrease-factor>3</time-decrease-factor>
+-                    <frequency-decrease-factor>3</frequency-decrease-factor>
+-                    <restore-revised>1</restore-revised>
+-                    <restore-masks>0</restore-masks>
+-                    <children>
+-                      <action type="HighPassFilterAction">
+-                        <horizontal-kernel-sigma-sq>2.5</horizontal-kernel-sigma-sq>
+-                        <vertical-kernel-sigma-sq>5</vertical-kernel-sigma-sq>
+-                        <window-width>21</window-width>
+-                        <window-height>31</window-height>
+-                        <mode>1</mode>
+-                      </action>
+-                    </children>
+-                  </action>
+-                </children>
+-              </action>
+-              <action type="SumThresholdAction">
+-                <base-sensitivity>1</base-sensitivity>
+-                <time-direction-flagging>1</time-direction-flagging>
+-                <frequency-direction-flagging>1</frequency-direction-flagging>
+-              </action>
+-            </children>
+-          </action>
+-        </children>
+-      </action>
+-      <action type="SetFlaggingAction">
+-        <new-flagging>4</new-flagging>
+-      </action>
+-      <action type="StatisticalFlagAction">
+-        <enlarge-frequency-size>0</enlarge-frequency-size>
+-        <enlarge-time-size>0</enlarge-time-size>
+-        <max-contaminated-frequencies-ratio>0.5</max-contaminated-frequencies-ratio>
+-        <max-contaminated-times-ratio>0.5</max-contaminated-times-ratio>
+-        <minimum-good-frequency-ratio>0.2</minimum-good-frequency-ratio>
+-        <minimum-good-time-ratio>0.2</minimum-good-time-ratio>
+-      </action>
+-      <action type="TimeSelectionAction">
+-        <threshold>3.5</threshold>
+-      </action>
+-    </children>
+-  </action>
++<?xml version="1.0" encoding="UTF-8"?>
++<!-- This is a strategy configuration file for the AOFlagger RFI
++detector by André Offringa (offringa@gmail.com).
++Created by AOFlagger 2.7.2 (2015-09-27)
++-->
++<rfi-strategy format-version="3.7" reader-version-required="3.4">
++  <action type="Strategy">
++    <children>
++      <action type="SetFlaggingAction">
++        <new-flagging>0</new-flagging>
++      </action>
++      <action type="ForEachPolarisationBlock">
++        <on-xx>1</on-xx>
++        <on-xy>1</on-xy>
++        <on-yx>1</on-yx>
++        <on-yy>1</on-yy>
++        <on-stokes-i>0</on-stokes-i>
++        <on-stokes-q>0</on-stokes-q>
++        <on-stokes-u>0</on-stokes-u>
++        <on-stokes-v>0</on-stokes-v>
++        <children>
++          <action type="ForEachComplexComponentAction">
++            <on-amplitude>1</on-amplitude>
++            <on-phase>0</on-phase>
++            <on-real>0</on-real>
++            <on-imaginary>0</on-imaginary>
++            <restore-from-amplitude>0</restore-from-amplitude>
++            <children>
++              <action type="IterationBlock">
++                <iteration-count>2</iteration-count>
++                <sensitivity-start>4</sensitivity-start>
++                <children>
++                  <action type="SumThresholdAction">
++                    <base-sensitivity>1</base-sensitivity>
++                    <time-direction-flagging>1</time-direction-flagging>
++                    <frequency-direction-flagging>1</frequency-direction-flagging>
++                  </action>
++                  <action type="CombineFlagResults">
++                    <children>
++                      <action type="FrequencySelectionAction">
++                        <threshold>3</threshold>
++                      </action>
++                      <action type="TimeSelectionAction">
++                        <threshold>3.5</threshold>
++                      </action>
++                    </children>
++                  </action>
++                  <action type="SetImageAction">
++                    <new-image>1</new-image>
++                  </action>
++                  <action type="ChangeResolutionAction">
++                    <time-decrease-factor>3</time-decrease-factor>
++                    <frequency-decrease-factor>3</frequency-decrease-factor>
++                    <restore-revised>1</restore-revised>
++                    <restore-masks>0</restore-masks>
++                    <children>
++                      <action type="HighPassFilterAction">
++                        <horizontal-kernel-sigma-sq>2.5</horizontal-kernel-sigma-sq>
++                        <vertical-kernel-sigma-sq>5</vertical-kernel-sigma-sq>
++                        <window-width>21</window-width>
++                        <window-height>31</window-height>
++                        <mode>1</mode>
++                      </action>
++                    </children>
++                  </action>
++                </children>
++              </action>
++              <action type="SumThresholdAction">
++                <base-sensitivity>1</base-sensitivity>
++                <time-direction-flagging>1</time-direction-flagging>
++                <frequency-direction-flagging>1</frequency-direction-flagging>
++              </action>
++            </children>
++          </action>
++        </children>
++      </action>
++      <action type="SetFlaggingAction">
++        <new-flagging>4</new-flagging>
++      </action>
++      <action type="StatisticalFlagAction">
++        <enlarge-frequency-size>0</enlarge-frequency-size>
++        <enlarge-time-size>0</enlarge-time-size>
++        <max-contaminated-frequencies-ratio>0.5</max-contaminated-frequencies-ratio>
++        <max-contaminated-times-ratio>0.5</max-contaminated-times-ratio>
++        <minimum-good-frequency-ratio>0.2</minimum-good-frequency-ratio>
++        <minimum-good-time-ratio>0.2</minimum-good-time-ratio>
++      </action>
++      <action type="TimeSelectionAction">
++        <threshold>3.5</threshold>
++      </action>
++    </children>
++  </action>
+ </rfi-strategy>
+\ No newline at end of file
+--- /dev/null
++++ dp3-5.2/external/pybind11/CMakeFiles/CMakeDirectoryInformation.cmake
+@@ -0,0 +1,16 @@
++# CMAKE generated file: DO NOT EDIT!
++# Generated by "Unix Makefiles" Generator, CMake Version 3.16
++
++# Relative path conversion top directories.
++set(CMAKE_RELATIVE_PATH_TOP_SOURCE "/home/athanaseus/KERN/8/dp3-debian/dp3")
++set(CMAKE_RELATIVE_PATH_TOP_BINARY "/home/athanaseus/KERN/8/dp3-debian/dp3")
++
++# Force unix paths in dependencies.
++set(CMAKE_FORCE_UNIX_PATHS 1)
++
++
++# The C and CXX include file regular expressions for this directory.
++set(CMAKE_C_INCLUDE_REGEX_SCAN "^.*$")
++set(CMAKE_C_INCLUDE_REGEX_COMPLAIN "^$")
++set(CMAKE_CXX_INCLUDE_REGEX_SCAN ${CMAKE_C_INCLUDE_REGEX_SCAN})
++set(CMAKE_CXX_INCLUDE_REGEX_COMPLAIN ${CMAKE_C_INCLUDE_REGEX_COMPLAIN})
+--- /dev/null
++++ dp3-5.2/external/pybind11/CMakeFiles/progress.marks
+@@ -0,0 +1 @@
++0
+--- /dev/null
++++ dp3-5.2/external/pybind11/Makefile
+@@ -0,0 +1,184 @@
++# CMAKE generated file: DO NOT EDIT!
++# Generated by "Unix Makefiles" Generator, CMake Version 3.16
++
++# Default target executed when no arguments are given to make.
++default_target: all
++
++.PHONY : default_target
++
++# Allow only one "make -f Makefile2" at a time, but pass parallelism.
++.NOTPARALLEL:
++
++
++#=============================================================================
++# Special targets provided by cmake.
++
++# Disable implicit rules so canonical targets will work.
++.SUFFIXES:
++
++
++# Remove some rules from gmake that .SUFFIXES does not remove.
++SUFFIXES =
++
++.SUFFIXES: .hpux_make_needs_suffix_list
++
++
++# Suppress display of executed commands.
++$(VERBOSE).SILENT:
++
++
++# A target that is always out of date.
++cmake_force:
++
++.PHONY : cmake_force
++
++#=============================================================================
++# Set environment variables for the build.
++
++# The shell in which to execute make rules.
++SHELL = /bin/sh
++
++# The CMake executable.
++CMAKE_COMMAND = /usr/bin/cmake
++
++# The command to remove a file.
++RM = /usr/bin/cmake -E remove -f
++
++# Escaping for special characters.
++EQUALS = =
++
++# The top-level source directory on which CMake was run.
++CMAKE_SOURCE_DIR = /home/athanaseus/KERN/8/dp3-debian/dp3
++
++# The top-level build directory on which CMake was run.
++CMAKE_BINARY_DIR = /home/athanaseus/KERN/8/dp3-debian/dp3
++
++#=============================================================================
++# Targets provided globally by CMake.
++
++# Special rule for the target install/strip
++install/strip: preinstall
++	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Installing the project stripped..."
++	/usr/bin/cmake -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake
++.PHONY : install/strip
++
++# Special rule for the target install/strip
++install/strip/fast: preinstall/fast
++	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Installing the project stripped..."
++	/usr/bin/cmake -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake
++.PHONY : install/strip/fast
++
++# Special rule for the target install/local
++install/local: preinstall
++	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Installing only the local directory..."
++	/usr/bin/cmake -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake
++.PHONY : install/local
++
++# Special rule for the target install/local
++install/local/fast: preinstall/fast
++	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Installing only the local directory..."
++	/usr/bin/cmake -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake
++.PHONY : install/local/fast
++
++# Special rule for the target install
++install: preinstall
++	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Install the project..."
++	/usr/bin/cmake -P cmake_install.cmake
++.PHONY : install
++
++# Special rule for the target install
++install/fast: preinstall/fast
++	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Install the project..."
++	/usr/bin/cmake -P cmake_install.cmake
++.PHONY : install/fast
++
++# Special rule for the target list_install_components
++list_install_components:
++	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Available install components are: \"Unspecified\""
++.PHONY : list_install_components
++
++# Special rule for the target list_install_components
++list_install_components/fast: list_install_components
++
++.PHONY : list_install_components/fast
++
++# Special rule for the target rebuild_cache
++rebuild_cache:
++	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Running CMake to regenerate build system..."
++	/usr/bin/cmake -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR)
++.PHONY : rebuild_cache
++
++# Special rule for the target rebuild_cache
++rebuild_cache/fast: rebuild_cache
++
++.PHONY : rebuild_cache/fast
++
++# Special rule for the target edit_cache
++edit_cache:
++	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "No interactive CMake dialog available..."
++	/usr/bin/cmake -E echo No\ interactive\ CMake\ dialog\ available.
++.PHONY : edit_cache
++
++# Special rule for the target edit_cache
++edit_cache/fast: edit_cache
++
++.PHONY : edit_cache/fast
++
++# The main all target
++all: cmake_check_build_system
++	cd /home/athanaseus/KERN/8/dp3-debian/dp3 && $(CMAKE_COMMAND) -E cmake_progress_start /home/athanaseus/KERN/8/dp3-debian/dp3/CMakeFiles /home/athanaseus/KERN/8/dp3-debian/dp3/external/pybind11/CMakeFiles/progress.marks
++	cd /home/athanaseus/KERN/8/dp3-debian/dp3 && $(MAKE) -f CMakeFiles/Makefile2 external/pybind11/all
++	$(CMAKE_COMMAND) -E cmake_progress_start /home/athanaseus/KERN/8/dp3-debian/dp3/CMakeFiles 0
++.PHONY : all
++
++# The main clean target
++clean:
++	cd /home/athanaseus/KERN/8/dp3-debian/dp3 && $(MAKE) -f CMakeFiles/Makefile2 external/pybind11/clean
++.PHONY : clean
++
++# The main clean target
++clean/fast: clean
++
++.PHONY : clean/fast
++
++# Prepare targets for installation.
++preinstall: all
++	cd /home/athanaseus/KERN/8/dp3-debian/dp3 && $(MAKE) -f CMakeFiles/Makefile2 external/pybind11/preinstall
++.PHONY : preinstall
++
++# Prepare targets for installation.
++preinstall/fast:
++	cd /home/athanaseus/KERN/8/dp3-debian/dp3 && $(MAKE) -f CMakeFiles/Makefile2 external/pybind11/preinstall
++.PHONY : preinstall/fast
++
++# clear depends
++depend:
++	cd /home/athanaseus/KERN/8/dp3-debian/dp3 && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
++.PHONY : depend
++
++# Help Target
++help:
++	@echo "The following are some of the valid targets for this Makefile:"
++	@echo "... all (the default if no target is provided)"
++	@echo "... clean"
++	@echo "... depend"
++	@echo "... install/strip"
++	@echo "... install/local"
++	@echo "... install"
++	@echo "... list_install_components"
++	@echo "... rebuild_cache"
++	@echo "... edit_cache"
++.PHONY : help
++
++
++
++#=============================================================================
++# Special targets to cleanup operation of make.
++
++# Special rule to run CMake to check the build system integrity.
++# No rule that depends on this can have commands that come from listfiles
++# because they might be regenerated.
++cmake_check_build_system:
++	cd /home/athanaseus/KERN/8/dp3-debian/dp3 && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
++.PHONY : cmake_check_build_system
++
+--- /dev/null
++++ dp3-5.2/external/pybind11/cmake_install.cmake
+@@ -0,0 +1,39 @@
++# Install script for directory: /home/athanaseus/KERN/8/dp3-debian/dp3/external/pybind11
++
++# Set the install prefix
++if(NOT DEFINED CMAKE_INSTALL_PREFIX)
++  set(CMAKE_INSTALL_PREFIX "/usr/local")
++endif()
++string(REGEX REPLACE "/$" "" CMAKE_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
++
++# Set the install configuration name.
++if(NOT DEFINED CMAKE_INSTALL_CONFIG_NAME)
++  if(BUILD_TYPE)
++    string(REGEX REPLACE "^[^A-Za-z0-9_]+" ""
++           CMAKE_INSTALL_CONFIG_NAME "${BUILD_TYPE}")
++  else()
++    set(CMAKE_INSTALL_CONFIG_NAME "")
++  endif()
++  message(STATUS "Install configuration: \"${CMAKE_INSTALL_CONFIG_NAME}\"")
++endif()
++
++# Set the component getting installed.
++if(NOT CMAKE_INSTALL_COMPONENT)
++  if(COMPONENT)
++    message(STATUS "Install component: \"${COMPONENT}\"")
++    set(CMAKE_INSTALL_COMPONENT "${COMPONENT}")
++  else()
++    set(CMAKE_INSTALL_COMPONENT)
++  endif()
++endif()
++
++# Install shared libraries without execute permission?
++if(NOT DEFINED CMAKE_INSTALL_SO_NO_EXE)
++  set(CMAKE_INSTALL_SO_NO_EXE "1")
++endif()
++
++# Is this installation the result of a crosscompile?
++if(NOT DEFINED CMAKE_CROSSCOMPILING)
++  set(CMAKE_CROSSCOMPILING "FALSE")
++endif()
++

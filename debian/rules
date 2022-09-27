@@ -1,4 +1,8 @@
 #!/usr/bin/make -f
 
 %:
-	dh $@  --with python2 --parallel 
+	dh $@
+
+override_dh_auto_configure:
+	mkdir obj-$(DEB_BUILD_MULTIARCH)
+	cd obj-$(DEB_BUILD_MULTIARCH) && cmake -DCMAKE_INSTALL_LIBDIR=lib/$(DEB_BUILD_MULTIARCH) -DAOFLAGGER_LIB=/usr/lib/libaoflagger.so.0 ..

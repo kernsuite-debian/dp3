@@ -6,16 +6,19 @@ Build-Depends:
  cmake,
  debhelper (>= 11),
  dh-python,
- python-all,
+ python3-all,
  libhdf5-dev,
- casacore-dev,
+ casacore-dev (=3.2.1-4build3),
  libblas-dev,
+ libopenblas-dev,
  liblapack-dev,
  libboost-dev,
- python-dev,
+ libboost-all-dev,
+ python3-dev,
  libboost-filesystem-dev,
  libboost-system-dev,
  libboost-test-dev,
+ libboost-thread-dev,
  libboost-date-time-dev,
  libboost-program-options-dev,
  libboost-python-dev,
@@ -24,22 +27,25 @@ Build-Depends:
  libcfitsio-dev,
  libarmadillo-dev,
  aoflagger-dev,
- lofarbeam-dev,
- libboost-signals-dev,
+ everybeam,
  libgtkmm-3.0-dev,
- idg-dev
-Standards-Version: 4.5.0
+ idg-dev,
+ pkg-config,
+ pybind11-dev,
+ wcslib-dev,
+ wget
+Standards-Version: 4.6.1
 Homepage: https://github.com/lofar-astron/DP3
-X-Python-Version: >= 2.6
+X-Python3-Version: >= 3.6
 
-Package: python-dp3
+Package: python3-dp3
 Architecture: any
-Conflicts: python-lofar
-Depends: ${misc:Depends}, ${shlibs:Depends}, ${python:Depends}
-Description: streaming processing pipeline for radio data (python 2)
+Conflicts: python3-lofar
+Depends: ${misc:Depends}, ${shlibs:Depends}, ${python3:Depends}
+Description: streaming processing pipeline for radio data (python 3)
 
 Package: dp3
 Architecture: any
 Multi-Arch: foreign
-Depends: ${misc:Depends}, ${shlibs:Depends}
+Depends: ${misc:Depends}, ${shlibs:Depends}, python3-dp3
 Description: streaming processing pipeline for radio data
